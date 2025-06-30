@@ -9,6 +9,7 @@ import ParkingGrid from '../components/ParkingGrid';
 import CustomerList from '../components/CustomerList';
 import ParkingStats from '../components/ParkingStats';
 import DeletedUsersList from '../components/DeletedUsersList';
+import ParkingHistory from '../components/ParkingHistory';
 
 const AdminDashboard = () => {
     const { user, logout } = useAuth();
@@ -295,11 +296,12 @@ const AdminDashboard = () => {
                 {/* Parking Statistics Cards */}
                 <ParkingStats slots={sortedParkingSlots} />
 
-                {/* New two-column layout for better organization */}
-                <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* New layout for better organization */}
+                <main className="grid grid-cols-1 xl:grid-cols-4 gap-8">
                     
-                    {/* Parking Grid Section (takes up 2/3 of the width on large screens) */}
-                    <div className="lg:col-span-2">
+                    {/* Parking Grid and History Section (takes up 3/4 of the width on extra large screens) */}
+                    <div className="xl:col-span-3 space-y-6">
+                        {/* Parking Grid */}
                         <div className="p-6 bg-white rounded-lg shadow-md">
                             <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-2xl font-bold text-gray-800">Parking Layout</h2>
@@ -316,10 +318,13 @@ const AdminDashboard = () => {
                                onToggleStatus={handleToggleSlotStatus}
                             />
                         </div>
+                        
+                        {/* Parking History */}
+                        <ParkingHistory />
                     </div>
 
-                    {/* Staff Management Section (takes up 1/3 of the width on large screens) */}
-                    <div className="lg:col-span-1 space-y-6">
+                    {/* Admin Management Section (takes up 1/4 of the width on extra large screens) */}
+                    <div className="xl:col-span-1 space-y-6">
                         <RegisterStaffForm onRegisterStaff={handleRegisterStaff} />
                         {/* Pass the delete handler to the StaffList component */}
                         <StaffList staffMembers={staffMembers} onDeleteStaff={handleDeleteStaff} />

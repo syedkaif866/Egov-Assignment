@@ -7,6 +7,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { normalizeVehicleNumber } from '../utils/vehicle'; // --- 3. IMPORT normalization function ---
 import ParkingGrid from '../components/ParkingGrid';
 import ParkingStats from '../components/ParkingStats';
+import ParkingHistory from '../components/ParkingHistory';
 
 // A new component to show the list of walk-ins
 const WalkInCustomerList = ({ customers }) => {
@@ -16,7 +17,7 @@ const WalkInCustomerList = ({ customers }) => {
 
     return (
         <div className="mt-8 p-6 bg-white rounded-lg shadow-md">
-            <h3 className="text-xl font-semibold mb-4">Today's Walk-in Customers</h3>
+            <h3 className="text-xl font-semibold mb-4">Active Walk-in Customers</h3>
             <ul className="space-y-2">
                 {customers.map(customer => (
                     <li key={customer.id} className="p-2 bg-gray-50 rounded">
@@ -322,13 +323,12 @@ const StaffDashboard = () => {
                 {/* Parking Statistics Cards */}
                 <ParkingStats slots={sortedParkingSlots} />
 
-                <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <main className="grid grid-cols-1 xl:grid-cols-4 gap-8">
                     {/* Parking Grid Section */}
-                    <div className="lg:col-span-2">
+                    <div className="xl:col-span-3 space-y-6">
+                        {/* Parking Grid */}
                         <div className="p-6 bg-white rounded-lg shadow-md">
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-2xl font-bold text-gray-800">Parking Management</h2>
-                            </div>
+                            <h2 className="text-2xl font-bold text-gray-800 mb-4">Parking Management</h2>
                             <p className="text-gray-600 mb-4">
                                 Click on <span className="text-green-600 font-semibold">available slots</span> to book for walk-in customers • 
                                 Click on <span className="text-red-600 font-semibold">occupied slots</span> to exit both regular and walk-in customers • 
@@ -341,10 +341,13 @@ const StaffDashboard = () => {
                                 isAdmin={false}
                             />
                         </div>
+                        
+                        {/* Parking History */}
+                        <ParkingHistory />
                     </div>
 
                     {/* Staff Actions Section */}
-                    <div className="lg:col-span-1 space-y-6">
+                    <div className="xl:col-span-1 space-y-6">
                         <WalkInRegistrationForm onRegisterWalkIn={handleRegisterWalkIn} />
                         {/* Add the WalkInCustomerList to show registered walk-ins */}
                         <WalkInCustomerList customers={walkInCustomers} />
