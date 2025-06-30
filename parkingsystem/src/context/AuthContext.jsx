@@ -13,23 +13,50 @@ export const AuthProvider = ({ children }) => {
     const navigate = useNavigate();
 
     // Persist user session on page reload
+    // Persist user session on page reload
     useEffect(() => {
-        const loggedInUser = sessionStorage.getItem('parkingUser');
-        if (loggedInUser) {
-            setUser(JSON.parse(loggedInUser));
+        try {
+            const loggedInUser = sessionStorage.getItem('parkingUser');
+            if (loggedInUser) {
+                const parsedUser = JSON.parse(loggedInUser);
+                setUser(parsedUser);
+            }
+        } catch (error) {
+            console.error("Failed to parse user from sessionStorage:", error);
+            sessionStorage.removeItem('parkingUser'); // Clear corrupted data
         }
         setLoading(false);
-    }, []);
+    }, []); // This useEffect is correct
 
+    // --- 2. UPDATE THE LOGIN FUNCTION WITH ROLE-BASED REDIRECTION ---
     const login = async (email, password) => {
         const potentialUser = await db.users.where('email').equals(email).first();
+        
         if (potentialUser && potentialUser.password === password) {
             setUser(potentialUser);
             sessionStorage.setItem('parkingUser', JSON.stringify(potentialUser));
-            navigate('/dashboard');
-        } else {
-            alert('Invalid email or password!');
+            
+            // This is the critical change: Redirect based on the user's role
+            switch(potentialUser.role) {
+                case 'admin':
+                    navigate('/admin/dashboard');
+                    break;
+                case 'staff':
+                    navigate('/staff/dashboard');
+                    break;
+                case 'customer':
+                    navigate('/customer/dashboard');
+                    break;
+                default:
+                    // Fallback to a generic dashboard or home page if role is unknown
+                    navigate('/'); 
+            }
+            return true; // Return true on success
         }
+        
+        // This 'else' is no longer needed
+        alert('Invalid email or password!');
+        return false; // Return false on failure
     };
 
     const register = async (userData) => {
@@ -97,7 +124,7 @@ export const AuthProvider = ({ children }) => {
 
     return (
         <AuthContext.Provider value={value}>
-            {children}
+            {!loading && children}
         </AuthContext.Provider>
     );
 };

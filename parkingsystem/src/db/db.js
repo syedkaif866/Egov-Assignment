@@ -3,10 +3,13 @@ import Dexie from 'dexie';
 
 export const db = new Dexie('parkingAppDB');
 
-db.version(3).stores({
-  // Added mobileNumber and customerType. customerType helps differentiate walk-ins.
+db.version(4).stores({
   users: '++id, &email, &vehicleNumber, role, mobileNumber, customerType',
-  parkingSlots: '++id, slotNumber, status, bookedByUserId',
+  // Define the parkingSlots table
+  // ++id = auto-incrementing primary key
+  // &slotNumber = unique index, ensuring no duplicate slot numbers
+  // status = regular index for fast lookups
+  parkingSlots: '++id, &slotNumber, status, bookedByUserId, vehicleNumber, entryTime',
   parkingHistory: '++id, slotId, vehicleNumber, entryTime, exitTime',
 });
 
