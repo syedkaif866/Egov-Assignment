@@ -312,6 +312,7 @@ const AdminDashboard = () => {
                             <ParkingGrid 
                                 slots={sortedParkingSlots}
                                 isAdmin={true}
+                                userRole="admin"
                                 onDeleteSlot={handleDeleteSlot}
                                onToggleStatus={handleToggleSlotStatus}
                             />

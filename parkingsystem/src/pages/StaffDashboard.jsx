@@ -351,6 +351,7 @@ const StaffDashboard = () => {
                                 slots={sortedParkingSlots} 
                                 onSlotClick={handleSlotClick}
                                 isAdmin={false}
+                                userRole="staff"
                             />
                         </div>
                         

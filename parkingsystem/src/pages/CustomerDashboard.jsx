@@ -1,5 +1,5 @@
 // src/pages/CustomerDashboard.jsx
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../db/db';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -7,8 +7,20 @@ import { normalizeVehicleNumber } from '../utils/vehicle';
 import ParkingGrid from '../components/ParkingGrid';
 import ParkingStats from '../components/ParkingStats';
 
+
+
 const CustomerDashboard = () => {
     const { user, logout } = useAuth();
+    const [currentTime, setCurrentTime] = useState(new Date());
+
+    // Update current time every minute for real-time duration display
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 60000); // Update every minute
+
+        return () => clearInterval(timer);
+    }, []);
 
     // Fetch the raw parking slots from the database
     const rawParkingSlots = useLiveQuery(() => db.parkingSlots.toArray());
@@ -28,6 +40,19 @@ const CustomerDashboard = () => {
         if (!sortedParkingSlots || !user) return null;
         return sortedParkingSlots.find(slot => slot.bookedByUserId === user.id);
     }, [sortedParkingSlots, user]);
+
+    // Calculate parking duration for the current slot
+    const parkingDuration = useMemo(() => {
+        if (!userCurrentSlot || !userCurrentSlot.entryTime) return null;
+        
+        const entryTime = new Date(userCurrentSlot.entryTime);
+        const durationMs = currentTime - entryTime;
+        
+        const hours = Math.floor(durationMs / (1000 * 60 * 60));
+        const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+        
+        return { hours, minutes, entryTime };
+    }, [userCurrentSlot, currentTime]);
 
     // --- NEW: Function to handle booking a slot ---
     const handleBookSlot = async (slotToBook) => {
@@ -101,19 +126,30 @@ const CustomerDashboard = () => {
                         <p className="text-gray-600 mt-1">
                             Welcome, {user?.name}!
                         </p>
-                        {userCurrentSlot && (
-                            <p className="text-blue-600 mt-1 font-medium">
-                                Currently parked: Slot {userCurrentSlot.slotNumber} • Vehicle: {userCurrentSlot.vehicleNumber}
-                            </p>
+                        <p className="text-sm text-gray-500 mt-1">
+                            Email: {user?.email}
+                        </p>
+                        {userCurrentSlot && parkingDuration && (
+                            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <p className="text-blue-800 font-medium">
+                                    🚗 Currently Parked
+                                </p>
+                                <p className="text-blue-700 text-sm mt-1">
+                                    <strong>Slot:</strong> {userCurrentSlot.slotNumber} • <strong>Vehicle:</strong> {userCurrentSlot.vehicleNumber}
+                                </p>
+                                <p className="text-blue-700 text-sm">
+                                    <strong>Entry Time:</strong> {parkingDuration.entryTime.toLocaleString()}
+                                </p>
+                                <p className="text-blue-700 text-sm">
+                                    <strong>Duration:</strong> {parkingDuration.hours}h {parkingDuration.minutes}m
+                                </p>
+                            </div>
                         )}
                     </div>
                     <button onClick={logout} className="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600 transition">
                         Logout
-                    </button>
-                </header>
+                    </button>                </header>
 
-                {/* Parking Statistics Cards */}
-                <ParkingStats slots={sortedParkingSlots} />
 
                 <main>
                     <div className="p-6 bg-white rounded-lg shadow-md">

@@ -1,5 +1,5 @@
 // src/components/ParkingHistory.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../db/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 
@@ -7,6 +7,16 @@ const ParkingHistory = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [searchType, setSearchType] = useState('vehicle'); // 'vehicle' or 'customer'
     const [showActiveOnly, setShowActiveOnly] = useState(false);
+    const [currentTime, setCurrentTime] = useState(new Date());
+
+    // Update current time every minute for real-time duration display
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 60000); // Update every minute
+
+        return () => clearInterval(timer);
+    }, []);
 
     // Get all parking history
     const allParkingHistory = useLiveQuery(() => db.parkingHistory.toArray());
@@ -85,10 +95,10 @@ const ParkingHistory = () => {
 
     // Calculate duration
     const calculateDuration = (entryTime, exitTime) => {
-        if (!entryTime || !exitTime) return 'Ongoing';
+        if (!entryTime) return 'N/A';
         
         const entry = new Date(entryTime);
-        const exit = new Date(exitTime);
+        const exit = exitTime ? new Date(exitTime) : currentTime; // Use current time if no exit time
         const durationMs = exit - entry;
         
         const hours = Math.floor(durationMs / (1000 * 60 * 60));
@@ -210,7 +220,10 @@ const ParkingHistory = () => {
                                          record.isActive ? <span className="text-green-600 font-medium">Ongoing</span> : 'N/A'}
                                     </td>
                                     <td className="px-3 py-2 text-sm text-gray-600">
-                                        {calculateDuration(record.entryTime, record.exitTime)}
+                                        <span className={record.isActive ? 'text-green-600 font-medium' : ''}>
+                                            {calculateDuration(record.entryTime, record.exitTime)}
+                                            {record.isActive && ' (ongoing)'}
+                                        </span>
                                     </td>
                                 </tr>
                             ))}

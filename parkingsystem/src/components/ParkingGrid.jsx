@@ -1,8 +1,8 @@
 // src/components/ParkingGrid.jsx
 import React from 'react';
 
-// --- UPDATE 1: Add 'onSlotClick' to the list of props for ParkingSlot ---
-const ParkingSlot = ({ slot, isAdmin, onDelete, onSlotClick, onToggleStatus }) => {
+// --- UPDATE 1: Add 'onSlotClick' and 'userRole' to the list of props for ParkingSlot ---
+const ParkingSlot = ({ slot, isAdmin, userRole, onDelete, onSlotClick, onToggleStatus }) => {
     
     // --- UPDATE 2: Add hover styles and cursor for clickable slots ---
     const getSlotStyles = () => {
@@ -14,8 +14,8 @@ const ParkingSlot = ({ slot, isAdmin, onDelete, onSlotClick, onToggleStatus }) =
         
         let styles = baseStyles[slot.status] || 'bg-gray-100 border-gray-400';
         
-        // For customers (non-admin), make maintenance slots appear more disabled
-        if (!isAdmin && slot.status === 'maintenance') {
+        // For customers (non-admin, non-staff), make maintenance slots appear more disabled
+        if (userRole === 'customer' && slot.status === 'maintenance') {
             styles = 'bg-gray-200 border-gray-400 text-gray-500 opacity-60';
         }
         
@@ -23,10 +23,10 @@ const ParkingSlot = ({ slot, isAdmin, onDelete, onSlotClick, onToggleStatus }) =
         if ((isAdmin && onToggleStatus) || onSlotClick) {
             if (slot.status === 'available') {
                 styles += ' hover:bg-green-200 cursor-pointer';
-            } else if (slot.status === 'maintenance' && isAdmin) {
+            } else if (slot.status === 'maintenance' && (isAdmin || userRole === 'staff')) {
                 // Only allow admin/staff to hover on maintenance slots
                 styles += ' hover:bg-yellow-200 cursor-pointer';
-            } else if (slot.status === 'occupied' && onSlotClick && isAdmin) {
+            } else if (slot.status === 'occupied' && onSlotClick && (isAdmin || userRole === 'staff')) {
                 // Only allow admin/staff to click on occupied slots for exit functionality
                 styles += ' hover:bg-red-200 cursor-pointer';
             }
@@ -45,7 +45,7 @@ const ParkingSlot = ({ slot, isAdmin, onDelete, onSlotClick, onToggleStatus }) =
         else if (onSlotClick) {
             // For customers: only allow clicking on available slots (not maintenance or occupied)
             // For staff: allow clicking on available (book), occupied (exit), and maintenance (manage) slots
-            if (isAdmin) {
+            if (isAdmin || userRole === 'staff') {
                 // Admin/Staff can click on all slot types
                 if (slot.status === 'available' || slot.status === 'occupied' || slot.status === 'maintenance') {
                     onSlotClick(slot);
@@ -92,8 +92,8 @@ const ParkingSlot = ({ slot, isAdmin, onDelete, onSlotClick, onToggleStatus }) =
     );
 };
 
-// --- UPDATE 7: Add 'onSlotClick' to the props for ParkingGrid ---
-const ParkingGrid = ({ slots, isAdmin = false, onDeleteSlot = () => {}, onSlotClick = null, onToggleStatus = null }) => {
+// --- UPDATE 7: Add 'onSlotClick' and 'userRole' to the props for ParkingGrid ---
+const ParkingGrid = ({ slots, isAdmin = false, userRole = 'customer', onDeleteSlot = () => {}, onSlotClick = null, onToggleStatus = null }) => {
     if (!slots) {
         return <div className="text-center p-8">Loading parking slots...</div>;
     }
@@ -118,7 +118,8 @@ const ParkingGrid = ({ slots, isAdmin = false, onDeleteSlot = () => {}, onSlotCl
                 <ParkingSlot 
                     key={slot.id} 
                     slot={slot} 
-                    isAdmin={isAdmin} 
+                    isAdmin={isAdmin}
+                    userRole={userRole}
                     onDelete={onDeleteSlot}
                     // --- UPDATE 8: Pass the onSlotClick prop down to each ParkingSlot ---
                     onSlotClick={onSlotClick}
