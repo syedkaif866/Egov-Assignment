@@ -1,7 +1,9 @@
+
 // src/context/AuthContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { db } from "../db/db"
 import { useNavigate } from 'react-router-dom';
+import { normalizeVehicleNumber } from '../utils/vehicle'; // <-- IMPORT THE UTILITY
 
 const AuthContext = createContext();
 
@@ -21,28 +23,13 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (email, password) => {
         const potentialUser = await db.users.where('email').equals(email).first();
-        
         if (potentialUser && potentialUser.password === password) {
             setUser(potentialUser);
-            sessionStorage.setItem('parkingUser', JSON.stringify(potentialUser)); // Use sessionStorage for persistence
-            // Redirect based on role
-            switch(potentialUser.role) {
-                case 'admin':
-                    navigate('/admin/dashboard');
-                    break;
-                case 'staff':
-                    navigate('/staff/dashboard');
-                    break;
-                case 'customer':
-                    navigate('/customer/dashboard');
-                    break;
-                default:
-                    navigate('/');
-            }
-            return true;
+            sessionStorage.setItem('parkingUser', JSON.stringify(potentialUser));
+            navigate('/dashboard');
+        } else {
+            alert('Invalid email or password!');
         }
-        alert('Invalid credentials');
-        return false;
     };
 
     const register = async (userData) => {
@@ -52,42 +39,43 @@ export const AuthProvider = ({ children }) => {
             return;
         }
 
+        const normalizedVehicleNo = normalizeVehicleNumber(userData.vehicleNumber);
+        if (!normalizedVehicleNo) {
+            alert('Invalid vehicle number format. Please enter a valid vehicle number.');
+            return;
+        }
+
         try {
             // Check if user already exists
             const existingUser = await db.users.where('email').equals(userData.email).first();
             if (existingUser) {
                 alert('User with this email already exists!');
-                return; // Stop execution
+                return;
             }
 
-            // Check if vehicle number already exists
-            const existingVehicle = await db.users.where('vehicleNumber').equals(userData.vehicleNumber).first();
+            // Check for existing vehicle
+            const existingVehicle = await db.users.where('vehicleNumber').equals(normalizedVehicleNo).first();
             if (existingVehicle) {
-                alert('User with this vehicle number already exists!');
-                return; // Stop execution
+                alert(`Error: Vehicle number "${userData.vehicleNumber}" is already registered.`);
+                return;
             }
 
-
-            // Create the new user object
             const newUser = {
                 name: userData.name,
                 email: userData.email,
-                password: userData.password, // Remember: In a real app, hash this!
-                vehicleNumber: userData.vehicleNumber,
-                role: 'customer'
+                password: userData.password,
+                vehicleNumber: normalizedVehicleNo, // <-- SAVE NORMALIZED VERSION
+                role: 'customer',
+                customerType: 'registered', // Set customer type on registration
+                mobileNumber: null // Or you could add this field to the registration form
             };
-            
-            console.log("Attempting to add new user:", newUser);
 
-            // Add to the database
-            const id = await db.users.add(newUser);
+            await db.users.add(newUser);
 
-            console.log(`User successfully added with ID: ${id}`);
             alert('Registration successful! Please log in.');
             navigate('/login');
 
         } catch (error) {
-            // This block will catch any errors from the 'await' calls
             console.error("Registration failed:", error);
             alert(`Registration failed. Please check the console for details.`);
         }
@@ -99,16 +87,21 @@ export const AuthProvider = ({ children }) => {
         navigate('/login');
     };
 
-    const value = { user, loading, login, logout, register };
+    const value = {
+        user,
+        loading,
+        login,
+        logout,
+        register
+    };
 
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     );
 };
 
-// Custom hook to use the auth context
 export const useAuth = () => {
     return useContext(AuthContext);
 };

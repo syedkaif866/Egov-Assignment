@@ -3,9 +3,9 @@ import Dexie from 'dexie';
 
 export const db = new Dexie('parkingAppDB');
 
-db.version(2).stores({
-  // Add '&vehicleNumber' to create a unique index on the vehicleNumber field
-  users: '++id, &email, &vehicleNumber, role', 
+db.version(3).stores({
+  // Added mobileNumber and customerType. customerType helps differentiate walk-ins.
+  users: '++id, &email, &vehicleNumber, role, mobileNumber, customerType',
   parkingSlots: '++id, slotNumber, status, bookedByUserId',
   parkingHistory: '++id, slotId, vehicleNumber, entryTime, exitTime',
 });
