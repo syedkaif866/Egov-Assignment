@@ -92,6 +92,10 @@ const StaffDashboard = () => {
             // Staff can exit/free this slot for any customer
             await handleExitSlot(slot);
         }
+        else if (slot.status === 'maintenance') {
+            // Staff can toggle maintenance status for this slot
+            await handleMaintenanceSlot(slot);
+        }
         // Staff cannot do anything with maintenance slots via click
     };
 
@@ -209,7 +213,7 @@ const StaffDashboard = () => {
             }
 
             // If this is a walk-in customer, move them to deletedusers table
-            if (customer) {
+            if (customer && customer.customerType === 'walk-in') {
                 try {
                     // Add to deletedusers table
                     await db.deletedusers.add({
@@ -252,6 +256,54 @@ const StaffDashboard = () => {
         }
     };
 
+    // --- NEW: Function to handle maintenance slot operations ---
+    const handleMaintenanceSlot = async (slot) => {
+        if (slot.status !== 'maintenance') {
+            alert('This slot is not currently under maintenance.');
+            return;
+        }
+
+        // Create options for staff
+        const options = [
+            '1. Make slot available (remove maintenance status)',
+            '2. Delete this slot permanently',
+            '',
+            'Enter your choice (1 or 2):'
+        ].join('\n');
+
+        const choice = prompt(options);
+        if (!choice) return; // User cancelled
+
+        const selectedOption = parseInt(choice);
+
+        if (selectedOption === 1) {
+            // Make slot available
+            if (window.confirm(`Make slot ${slot.slotNumber} available for booking?\n\nThis will remove the maintenance status and allow customers to book this slot.`)) {
+                try {
+                    await db.parkingSlots.update(slot.id, {
+                        status: 'available',
+                    });
+                    alert(`Slot ${slot.slotNumber} is now available for booking!`);
+                } catch (error) {
+                    console.error("Failed to update slot status:", error);
+                    alert("Failed to update slot status. Please try again.");
+                }
+            }
+        } else if (selectedOption === 2) {
+            // Delete slot permanently
+            if (window.confirm(`Delete slot ${slot.slotNumber} permanently?\n\nThis action cannot be undone. The slot will be completely removed from the system.`)) {
+                try {
+                    await db.parkingSlots.delete(slot.id);
+                    alert(`Slot ${slot.slotNumber} has been deleted permanently.`);
+                } catch (error) {
+                    console.error("Failed to delete slot:", error);
+                    alert("Failed to delete slot. Please try again.");
+                }
+            }
+        } else {
+            alert('Invalid selection. Please choose 1 or 2.');
+        }
+    };
 
     // --- 7. UPDATE the JSX to the new two-column layout ---
     return (
@@ -274,10 +326,13 @@ const StaffDashboard = () => {
                     {/* Parking Grid Section */}
                     <div className="lg:col-span-2">
                         <div className="p-6 bg-white rounded-lg shadow-md">
-                            <h2 className="text-2xl font-bold text-gray-800 mb-4">Parking Management</h2>
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-2xl font-bold text-gray-800">Parking Management</h2>
+                            </div>
                             <p className="text-gray-600 mb-4">
                                 Click on <span className="text-green-600 font-semibold">available slots</span> to book for walk-in customers • 
-                                Click on <span className="text-red-600 font-semibold">occupied slots</span> to exit both regular and walk-in customers
+                                Click on <span className="text-red-600 font-semibold">occupied slots</span> to exit both regular and walk-in customers • 
+                                Click on <span className="text-yellow-600 font-semibold">maintenance slots</span> to make available or delete
                             </p>
                             {/* Render the grid with interactive capabilities for staff */}
                             <ParkingGrid 

@@ -182,7 +182,7 @@ const AdminDashboard = () => {
     const handleDeleteSlot = async (id) => {
         if (window.confirm("Are you sure you want to delete this specific slot?")) {
             const slotToDelete = await db.parkingSlots.get(id);
-            if (slotToDelete && slotToDelete.status === 'available') {
+            if (slotToDelete && (slotToDelete.status === 'available'|| slotToDelete.status === 'maintenance')) {
                 try {
                     await db.parkingSlots.delete(id);
                 } catch (error) {

@@ -18,7 +18,8 @@ const ParkingSlot = ({ slot, isAdmin, onDelete, onSlotClick, onToggleStatus }) =
         if ((isAdmin && onToggleStatus) || onSlotClick) {
             if (slot.status === 'available') {
                 styles += ' hover:bg-green-200 cursor-pointer';
-            } else if (slot.status === 'maintenance' && isAdmin) {
+            } else if (slot.status === 'maintenance') {
+                // Allow both admin and staff to click on maintenance slots
                 styles += ' hover:bg-yellow-200 cursor-pointer';
             } else if (slot.status === 'occupied' && onSlotClick) {
                 // Allow staff to click on occupied slots for exit functionality
@@ -38,8 +39,8 @@ const ParkingSlot = ({ slot, isAdmin, onDelete, onSlotClick, onToggleStatus }) =
         // If onSlotClick is provided (for staff or customer functionality)
         else if (onSlotClick) {
             // For customers: only allow clicking on available slots
-            // For staff: allow clicking on both available (book) and occupied (exit) slots
-            if (slot.status === 'available' || slot.status === 'occupied') {
+            // For staff: allow clicking on available (book), occupied (exit), and maintenance (manage) slots
+            if (slot.status === 'available' || slot.status === 'occupied' || slot.status === 'maintenance') {
                 onSlotClick(slot);
             }
         }
