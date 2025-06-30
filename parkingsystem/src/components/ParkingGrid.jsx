@@ -14,15 +14,20 @@ const ParkingSlot = ({ slot, isAdmin, onDelete, onSlotClick, onToggleStatus }) =
         
         let styles = baseStyles[slot.status] || 'bg-gray-100 border-gray-400';
         
+        // For customers (non-admin), make maintenance slots appear more disabled
+        if (!isAdmin && slot.status === 'maintenance') {
+            styles = 'bg-gray-200 border-gray-400 text-gray-500 opacity-60';
+        }
+        
         // Add hover and cursor styles for clickable slots
         if ((isAdmin && onToggleStatus) || onSlotClick) {
             if (slot.status === 'available') {
                 styles += ' hover:bg-green-200 cursor-pointer';
-            } else if (slot.status === 'maintenance') {
-                // Allow both admin and staff to click on maintenance slots
+            } else if (slot.status === 'maintenance' && isAdmin) {
+                // Only allow admin/staff to hover on maintenance slots
                 styles += ' hover:bg-yellow-200 cursor-pointer';
-            } else if (slot.status === 'occupied' && onSlotClick) {
-                // Allow staff to click on occupied slots for exit functionality
+            } else if (slot.status === 'occupied' && onSlotClick && isAdmin) {
+                // Only allow admin/staff to click on occupied slots for exit functionality
                 styles += ' hover:bg-red-200 cursor-pointer';
             }
         }
@@ -38,10 +43,18 @@ const ParkingSlot = ({ slot, isAdmin, onDelete, onSlotClick, onToggleStatus }) =
         }
         // If onSlotClick is provided (for staff or customer functionality)
         else if (onSlotClick) {
-            // For customers: only allow clicking on available slots
+            // For customers: only allow clicking on available slots (not maintenance or occupied)
             // For staff: allow clicking on available (book), occupied (exit), and maintenance (manage) slots
-            if (slot.status === 'available' || slot.status === 'occupied' || slot.status === 'maintenance') {
-                onSlotClick(slot);
+            if (isAdmin) {
+                // Admin/Staff can click on all slot types
+                if (slot.status === 'available' || slot.status === 'occupied' || slot.status === 'maintenance') {
+                    onSlotClick(slot);
+                }
+            } else {
+                // Customers can only click on available slots
+                if (slot.status === 'available') {
+                    onSlotClick(slot);
+                }
             }
         }
     };
