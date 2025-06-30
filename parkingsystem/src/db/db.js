@@ -3,10 +3,10 @@ import Dexie from 'dexie';
 
 export const db = new Dexie('parkingAppDB');
 
-db.version(6).stores({
+db.version(7).stores({
   users: '++id, &email, vehicleNumber, role, mobileNumber, customerType',
   parkingSlots: '++id, &slotNumber, status, bookedByUserId, vehicleNumber, entryTime',
-  parkingHistory: '++id, slotId, vehicleNumber, entryTime, exitTime',
+  parkingHistory: '++id, slotId, customerId, vehicleNumber, entryTime, exitTime',
   deletedusers: '++id, originalId, name, email, vehicleNumber, mobileNumber, customerType, deletedAt,deletedBy',
 });
 

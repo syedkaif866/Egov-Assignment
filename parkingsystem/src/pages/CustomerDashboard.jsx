@@ -5,25 +5,33 @@ import { db } from '../db/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { normalizeVehicleNumber } from '../utils/vehicle';
 import ParkingGrid from '../components/ParkingGrid';
-import ParkingStats from '../components/ParkingStats';
-
 
 
 const CustomerDashboard = () => {
     const { user, logout } = useAuth();
     const [currentTime, setCurrentTime] = useState(new Date());
 
-    // Update current time every minute for real-time duration display
+    // Update current time every second for real-time duration display
     useEffect(() => {
         const timer = setInterval(() => {
             setCurrentTime(new Date());
-        }, 60000); // Update every minute
+        }, 1000); // Update every second for real-time display
 
         return () => clearInterval(timer);
     }, []);
 
     // Fetch the raw parking slots from the database
     const rawParkingSlots = useLiveQuery(() => db.parkingSlots.toArray());
+
+    // Get customer's parking history - with error handling for database migration
+    const customerParkingHistory = useLiveQuery(() => {
+        try {
+            return user ? db.parkingHistory.where('customerId').equals(user.id).toArray() : [];
+        } catch (error) {
+            console.warn('Parking history query failed (database may be migrating):', error);
+            return [];
+        }
+    });
 
     // Sort the slots alphanumerically (so P10 comes after P9)
     const sortedParkingSlots = useMemo(() => {
@@ -53,6 +61,44 @@ const CustomerDashboard = () => {
         
         return { hours, minutes, entryTime };
     }, [userCurrentSlot, currentTime]);
+
+    // Combine customer's historical and current parking data
+    const customerAllParkingData = useMemo(() => {
+        const historicalData = customerParkingHistory || [];
+        const activeData = userCurrentSlot ? [{
+            id: `active-${userCurrentSlot.id}`,
+            slotId: userCurrentSlot.id,
+            slotNumber: userCurrentSlot.slotNumber,
+            customerId: user?.id,
+            vehicleNumber: userCurrentSlot.vehicleNumber,
+            entryTime: userCurrentSlot.entryTime,
+            exitTime: null,
+            isActive: true
+        }] : [];
+        
+        const allData = [...historicalData, ...activeData];
+        
+        // Sort by entry time (or exit time for completed sessions), newest first
+        return allData.sort((a, b) => {
+            const timeA = new Date(a.exitTime || a.entryTime || 0);
+            const timeB = new Date(b.exitTime || b.entryTime || 0);
+            return timeB - timeA;
+        });
+    }, [customerParkingHistory, userCurrentSlot, user]);
+
+    // Calculate duration for any parking session
+    const calculateDuration = (entryTime, exitTime) => {
+        if (!entryTime) return 'N/A';
+        
+        const entry = new Date(entryTime);
+        const exit = exitTime ? new Date(exitTime) : currentTime;
+        const durationMs = exit - entry;
+        
+        const hours = Math.floor(durationMs / (1000 * 60 * 60));
+        const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+        
+        return `${hours}h ${minutes}m`;
+    };
 
     // --- NEW: Function to handle booking a slot ---
     const handleBookSlot = async (slotToBook) => {
@@ -150,21 +196,97 @@ const CustomerDashboard = () => {
                         Logout
                     </button>                </header>
 
+                <main className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                    {/* Parking Grid Section */}
+                    <div className="xl:col-span-2">
+                        <div className="p-6 bg-white rounded-lg shadow-md">
+                            <h2 className="text-2xl font-bold text-gray-800 mb-2">Book a Parking Slot</h2>
+                            <p className="text-gray-600">
+                                {userCurrentSlot 
+                                    ? `You have an active booking in slot ${userCurrentSlot.slotNumber}. To book a different slot, please exit your current slot first through staff assistance.`
+                                    : "Click on any available (green) slot to book it. You'll be prompted to enter your vehicle number."
+                                }
+                            </p>
+                            
+                            <ParkingGrid 
+                                slots={sortedParkingSlots} 
+                                onSlotClick={handleBookSlot} // Pass the booking function to the grid
+                            />
+                        </div>
+                    </div>
 
-                <main>
-                    <div className="p-6 bg-white rounded-lg shadow-md">
-                        <h2 className="text-2xl font-bold text-gray-800 mb-2">Book a Parking Slot</h2>
-                        <p className="text-gray-600">
-                            {userCurrentSlot 
-                                ? `You have an active booking in slot ${userCurrentSlot.slotNumber}. To book a different slot, please exit your current slot first through staff assistance.`
-                                : "Click on any available (green) slot to book it. You'll be prompted to enter your vehicle number."
-                            }
-                        </p>
-                        
-                        <ParkingGrid 
-                            slots={sortedParkingSlots} 
-                            onSlotClick={handleBookSlot} // Pass the booking function to the grid
-                        />
+                    {/* Customer Parking History Section */}
+                    <div className="xl:col-span-1">
+                        <div className="p-6 bg-white rounded-lg shadow-md">
+                            <h2 className="text-xl font-bold text-gray-800 mb-4">
+                                My Parking History ({customerAllParkingData.length} records)
+                            </h2>
+                            
+                            <div className="max-h-96 overflow-y-auto">
+                                {customerAllParkingData.length === 0 ? (
+                                    <p className="text-gray-500 text-center py-4">
+                                        No parking history available.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {customerAllParkingData.map((record) => (
+                                            <div 
+                                                key={record.id} 
+                                                className={`p-3 rounded-lg border ${
+                                                    record.isActive 
+                                                        ? 'bg-green-50 border-green-200' 
+                                                        : 'bg-gray-50 border-gray-200'
+                                                }`}
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div>
+                                                        <p className="font-medium text-gray-800">
+                                                            Slot {record.slotNumber}
+                                                        </p>
+                                                        <p className="text-sm text-gray-600 font-mono">
+                                                            {record.vehicleNumber}
+                                                        </p>
+                                                    </div>
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                        record.isActive 
+                                                            ? 'bg-green-100 text-green-800' 
+                                                            : 'bg-gray-100 text-gray-800'
+                                                    }`}>
+                                                        {record.isActive ? 'Active' : 'Completed'}
+                                                    </span>
+                                                </div>
+                                                
+                                                <div className="text-xs text-gray-600 space-y-1">
+                                                    <p>
+                                                        <strong>Entry:</strong> {' '}
+                                                        {record.entryTime 
+                                                            ? new Date(record.entryTime).toLocaleString() 
+                                                            : 'N/A'
+                                                        }
+                                                    </p>
+                                                    {!record.isActive && (
+                                                        <p>
+                                                            <strong>Exit:</strong> {' '}
+                                                            {record.exitTime 
+                                                                ? new Date(record.exitTime).toLocaleString() 
+                                                                : 'N/A'
+                                                            }
+                                                        </p>
+                                                    )}
+                                                    <p>
+                                                        <strong>Duration:</strong> {' '}
+                                                        <span className={record.isActive ? 'text-green-600 font-medium' : ''}>
+                                                            {calculateDuration(record.entryTime, record.exitTime)}
+                                                            {record.isActive && ' (ongoing)'}
+                                                        </span>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </main>
             </div>
