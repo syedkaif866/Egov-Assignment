@@ -8,6 +8,7 @@ import StaffList from '../components/StaffList';
 import ParkingGrid from '../components/ParkingGrid';
 import CustomerList from '../components/CustomerList';
 import ParkingStats from '../components/ParkingStats';
+import DeletedUsersList from '../components/DeletedUsersList';
 
 const AdminDashboard = () => {
     const { user, logout } = useAuth();
@@ -17,6 +18,8 @@ const AdminDashboard = () => {
     const rawParkingSlots = useLiveQuery(() => db.parkingSlots.toArray());
     // --- NEW: Add a live query to get all customers ---
     const customers = useLiveQuery(() => db.users.where('role').equals('customer').toArray());
+    // --- NEW: Add a live query to get deleted walk-in customers ---
+    const deletedUsers = useLiveQuery(() => db.deletedusers.toArray());
 
 
     // --- 3. CREATE a correctly sorted list using useMemo ---
@@ -206,11 +209,67 @@ const AdminDashboard = () => {
 
     // --- NEW: Function to delete a customer ---
     const handleDeleteCustomer = async (customerId) => {
-        // A future improvement: check if the customer has an active booking and handle it.
-        if (window.confirm("Are you sure you want to delete this customer? This will not affect past parking history but cannot be undone.")) {
+        // Check if the customer has an active booking and handle it.
+        if (window.confirm("Are you sure you want to delete this customer? This will also free up any parking slots they have booked. This action cannot be undone.")) {
             try {
+                // Get customer information before deletion
+                const customer = await db.users.get(customerId);
+                
+                // 1. First, find and free any slots booked by this customer
+                const customerSlots = await db.parkingSlots.where('bookedByUserId').equals(customerId).toArray();
+                
+                if (customerSlots.length > 0) {
+                    // Free up all slots booked by this customer
+                    for (const slot of customerSlots) {
+                        // Add to parking history if there was an active booking
+                        if (slot.entryTime) {
+                            await db.parkingHistory.add({
+                                slotId: slot.id,
+                                slotNumber: slot.slotNumber,
+                                customerId: customerId,
+                                vehicleNumber: slot.vehicleNumber,
+                                entryTime: slot.entryTime,
+                                exitTime: new Date(),
+                            });
+                        }
+                        
+                        await db.parkingSlots.update(slot.id, {
+                            status: 'available',
+                            bookedByUserId: null,
+                            vehicleNumber: null,
+                            entryTime: null,
+                        });
+                    }
+                    console.log(`Freed ${customerSlots.length} parking slot(s) that were booked by the deleted customer.`);
+                }
+
+                // 2. If this is a walk-in customer, move to deletedusers table
+                if (customer && customer.customerType === 'walk-in') {
+                    await db.deletedusers.add({
+                        originalId: customer.id,
+                        name: customer.name,
+                        email: customer.email,
+                        vehicleNumber: customer.vehicleNumber,
+                        mobileNumber: customer.mobileNumber,
+                        customerType: customer.customerType,
+                        deletedAt: new Date(),
+                        deletedBy: user?.name || 'Admin',
+                    });
+                    console.log(`Walk-in customer ${customer.name} moved to deleted users table by admin`);
+                }
+
+                // 3. Delete the customer from users table
                 await db.users.delete(customerId);
-                alert("Customer deleted successfully.");
+                
+                const deletionMessage = customer && customer.customerType === 'walk-in' 
+                    ? `Walk-in customer deleted and moved to deleted users archive!`
+                    : `Customer deleted successfully!`;
+                
+                if (customerSlots.length > 0) {
+                    alert(`${deletionMessage} ${customerSlots.length} parking slot(s) have been freed up.`);
+                } else {
+                    alert(deletionMessage);
+                }
             } catch (error) {
                 console.error("Failed to delete customer:", error);
                 alert("An error occurred while deleting the customer.");
@@ -266,6 +325,8 @@ const AdminDashboard = () => {
                         <StaffList staffMembers={staffMembers} onDeleteStaff={handleDeleteStaff} />
                         {/* --- NEW: Add the CustomerList to the UI --- */}
                         <CustomerList customers={customers} onDeleteCustomer={handleDeleteCustomer} />
+                        {/* --- NEW: Add the DeletedUsersList to show deleted walk-in customers --- */}
+                        <DeletedUsersList deletedUsers={deletedUsers} />
                     </div>
                 </main>
             </div>

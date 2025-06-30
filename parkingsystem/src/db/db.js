@@ -3,14 +3,11 @@ import Dexie from 'dexie';
 
 export const db = new Dexie('parkingAppDB');
 
-db.version(4).stores({
+db.version(5).stores({
   users: '++id, &email, &vehicleNumber, role, mobileNumber, customerType',
-  // Define the parkingSlots table
-  // ++id = auto-incrementing primary key
-  // &slotNumber = unique index, ensuring no duplicate slot numbers
-  // status = regular index for fast lookups
   parkingSlots: '++id, &slotNumber, status, bookedByUserId, vehicleNumber, entryTime',
   parkingHistory: '++id, slotId, vehicleNumber, entryTime, exitTime',
+  deletedusers: '++id, originalId, name, email, vehicleNumber, mobileNumber, customerType, deletedAt',
 });
 
 // Seed an initial Admin user if one doesn't exist

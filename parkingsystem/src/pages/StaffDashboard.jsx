@@ -29,80 +29,16 @@ const WalkInCustomerList = ({ customers }) => {
     );
 };
 
-// const StaffDashboard = () => {
-
-//     const { user, logout } = useAuth();
-
-//     // Live query to show all walk-in customers
-//     const walkInCustomers = useLiveQuery(
-//         () => db.users.where('customerType').equals('walk-in').toArray()
-//     );
-
-//     const handleRegisterWalkIn = async ({ vehicleNumber, mobileNumber }) => {
-//         try {
-//             // 1. CHECK FOR EXISTING VEHICLE (Case-Insensitive)
-//             const existingVehicle = await db.users.where('vehicleNumber').equalsIgnoreCase(vehicleNumber).first();
-
-//             if (existingVehicle) {
-//                 alert(`Error: Vehicle number "${vehicleNumber}" is already registered to another user.`);
-//                 return; // Stop the process
-//             }
-
-//             // 2. CREATE THE WALK-IN USER RECORD
-//             const newUser = {
-//                 // We generate a fake but unique email to satisfy the schema's unique index
-//                 email: `walkin-${Date.now()}@parking.system`,
-//                 name: `Walk-in (${vehicleNumber})`,
-//                 password: null, // No password for walk-ins
-//                 role: 'customer',
-//                 customerType: 'walk-in', // This is the key identifier
-//                 vehicleNumber: vehicleNumber,
-//                 mobileNumber: mobileNumber,
-//             };
-
-//             // 3. ADD TO DATABASE
-//             await db.users.add(newUser);
-//             alert(`Walk-in customer with vehicle "${vehicleNumber}" registered successfully!`);
-//             // The WalkInCustomerList will update automatically thanks to useLiveQuery!
-
-//         } catch (error) {
-//             console.error("Failed to register walk-in customer:", error);
-//             alert("Registration failed. See console for details.");
-//         }
-//     };
-
-//     return (
-//         <div className="min-h-screen bg-gray-100 p-4 sm:p-6 lg:p-8">
-//             <div className="max-w-4xl mx-auto">
-//                 <header className="flex justify-between items-center mb-8">
-//                     <div>
-//                         <h1 className="text-3xl font-bold text-gray-800">Staff Dashboard</h1>
-//                         <p className="text-gray-600 mt-1">Welcome, {user?.name}!</p>
-//                     </div>
-//                     <button onClick={logout} className="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600 transition">
-//                         Logout
-//                     </button>
-//                 </header>
-
-//                 <main>
-//                     <WalkInRegistrationForm onRegisterWalkIn={handleRegisterWalkIn} />
-//                     <WalkInCustomerList customers={walkInCustomers} />
-//                     {/* Parking Slot View will go here later */}
-//                 </main>
-//             </div>
-//         </div>
-//     );
-// };
-
-// export default StaffDashboard;
-
-
-
 const StaffDashboard = () => {
     const { user, logout } = useAuth();
 
     // --- 5. FETCH AND SORT PARKING SLOTS (same logic as AdminDashboard) ---
     const rawParkingSlots = useLiveQuery(() => db.parkingSlots.toArray());
+    
+    // Live query to show all walk-in customers
+    const walkInCustomers = useLiveQuery(
+        () => db.users.where('customerType').equals('walk-in').toArray()
+    );
 
     const sortedParkingSlots = useMemo(() => {
         if (!rawParkingSlots) return [];
@@ -112,7 +48,6 @@ const StaffDashboard = () => {
             return numA - numB;
         });
     }, [rawParkingSlots]);
-
 
     // --- 6. UPDATE the registration logic to use normalization ---
     const handleRegisterWalkIn = async ({ vehicleNumber, mobileNumber }) => {
@@ -148,6 +83,175 @@ const StaffDashboard = () => {
         }
     };
 
+    // --- NEW: Function to handle slot click for staff operations ---
+    const handleSlotClick = async (slot) => {
+        if (slot.status === 'available') {
+            // Staff can book this slot for a walk-in customer
+            await handleBookSlotForWalkIn(slot);
+        } else if (slot.status === 'occupied') {
+            // Staff can exit/free this slot for any customer
+            await handleExitSlot(slot);
+        }
+        // Staff cannot do anything with maintenance slots via click
+    };
+
+    // --- NEW: Function to book a slot for walk-in customer ---
+    const handleBookSlotForWalkIn = async (slot) => {
+        if (!walkInCustomers || walkInCustomers.length === 0) {
+            alert('No walk-in customers available. Please register a walk-in customer first.');
+            return;
+        }
+
+        // Create a list of available walk-in customers (those without active bookings)
+        const availableWalkIns = [];
+        for (const customer of walkInCustomers) {
+            const hasActiveBooking = sortedParkingSlots.some(
+                parkingSlot => parkingSlot.bookedByUserId === customer.id
+            );
+            if (!hasActiveBooking) {
+                availableWalkIns.push(customer);
+            }
+        }
+
+        if (availableWalkIns.length === 0) {
+            alert('All walk-in customers already have active parking bookings.');
+            return;
+        }
+
+        // Create a selection dialog
+        let customerList = 'Select a walk-in customer to book this slot:\n\n';
+        availableWalkIns.forEach((customer, index) => {
+            customerList += `${index + 1}. ${customer.vehicleNumber} (${customer.mobileNumber})\n`;
+        });
+        customerList += '\nEnter the number of your choice:';
+
+        const choice = prompt(customerList);
+        if (!choice) return; // User cancelled
+
+        const customerIndex = parseInt(choice) - 1;
+        if (customerIndex < 0 || customerIndex >= availableWalkIns.length) {
+            alert('Invalid selection. Please try again.');
+            return;
+        }
+
+        const selectedCustomer = availableWalkIns[customerIndex];
+
+        // Confirm the booking
+        if (!window.confirm(`Book slot ${slot.slotNumber} for vehicle ${selectedCustomer.vehicleNumber}?`)) {
+            return;
+        }
+
+        try {
+            await db.parkingSlots.update(slot.id, {
+                status: 'occupied',
+                bookedByUserId: selectedCustomer.id,
+                vehicleNumber: selectedCustomer.vehicleNumber,
+                entryTime: new Date(),
+            });
+
+            alert(`Slot ${slot.slotNumber} booked successfully for walk-in customer ${selectedCustomer.vehicleNumber}!`);
+        } catch (error) {
+            console.error("Failed to book slot:", error);
+            alert("Failed to book slot. Please try again.");
+        }
+    };
+
+    // --- NEW: Function to exit/free a booked slot ---
+    const handleExitSlot = async (slot) => {
+        if (slot.status !== 'occupied') {
+            alert('This slot is not currently occupied.');
+            return;
+        }
+
+        // Get customer information
+        let customerInfo = 'Unknown Customer';
+        let customerType = 'Unknown';
+        let customer = null;
+        if (slot.bookedByUserId) {
+            try {
+                customer = await db.users.get(slot.bookedByUserId);
+                if (customer) {
+                    customerType = customer.customerType === 'walk-in' ? 'Walk-in' : 'Registered';
+                    customerInfo = `${customer.name} (${slot.vehicleNumber}) - ${customerType} Customer`;
+                }
+            } catch (error) {
+                console.error("Failed to get customer info:", error);
+            }
+        }
+
+        // Calculate parking duration
+        let durationText = '';
+        if (slot.entryTime) {
+            const entryTime = new Date(slot.entryTime);
+            const exitTime = new Date();
+            const durationMs = exitTime - entryTime;
+            const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
+            const durationMinutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+            durationText = `\nParking Duration: ${durationHours}h ${durationMinutes}m`;
+        }
+
+        // Confirm the exit
+        if (!window.confirm(`Free up slot ${slot.slotNumber}?\n\nCustomer: ${customerInfo}${durationText}\n\nThis will make the slot available for new bookings.`)) {
+            return;
+        }
+
+        try {
+            // Add to parking history before clearing the slot
+            if (slot.bookedByUserId && slot.entryTime) {
+                await db.parkingHistory.add({
+                    slotId: slot.id,
+                    slotNumber: slot.slotNumber,
+                    customerId: slot.bookedByUserId,
+                    vehicleNumber: slot.vehicleNumber,
+                    entryTime: slot.entryTime,
+                    exitTime: new Date(),
+                });
+            }
+
+            // If this is a walk-in customer, move them to deletedusers table
+            if (customer) {
+                try {
+                    // Add to deletedusers table
+                    await db.deletedusers.add({
+                        originalId: customer.id,
+                        name: customer.name,
+                        email: customer.email,
+                        vehicleNumber: customer.vehicleNumber,
+                        mobileNumber: customer.mobileNumber,
+                        customerType: customer.customerType,
+                        deletedAt: new Date(),
+                        deletedBy: user?.name || 'Staff', // Track who deleted the customer
+                    });
+
+                    // Remove from users table
+                    await db.users.delete(customer.id);
+                    
+                    console.log(`Walk-in customer ${customer.name} moved to deleted users table by ${user?.name}`);
+                } catch (error) {
+                    console.error("Failed to move walk-in customer to deleted users:", error);
+                    // Continue with slot clearing even if this fails
+                }
+            }
+
+            // Clear the slot
+            await db.parkingSlots.update(slot.id, {
+                status: 'available',
+                bookedByUserId: null,
+                vehicleNumber: null,
+                entryTime: null,
+            });
+
+            const exitMessage = customer && customer.customerType === 'walk-in' 
+                ? `Slot ${slot.slotNumber} has been freed up successfully!${durationText}\n\nWalk-in customer ${customer.name} has been checked out and removed from the system.`
+                : `Slot ${slot.slotNumber} has been freed up successfully!${durationText}`;
+            
+            alert(exitMessage);
+        } catch (error) {
+            console.error("Failed to exit slot:", error);
+            alert("Failed to free up the slot. Please try again.");
+        }
+    };
+
 
     // --- 7. UPDATE the JSX to the new two-column layout ---
     return (
@@ -170,16 +274,25 @@ const StaffDashboard = () => {
                     {/* Parking Grid Section */}
                     <div className="lg:col-span-2">
                         <div className="p-6 bg-white rounded-lg shadow-md">
-                            <h2 className="text-2xl font-bold text-gray-800 mb-4">Parking Availability</h2>
-                            {/* Render the grid in read-only mode, passing the sorted list */}
-                            <ParkingGrid slots={sortedParkingSlots} />
+                            <h2 className="text-2xl font-bold text-gray-800 mb-4">Parking Management</h2>
+                            <p className="text-gray-600 mb-4">
+                                Click on <span className="text-green-600 font-semibold">available slots</span> to book for walk-in customers • 
+                                Click on <span className="text-red-600 font-semibold">occupied slots</span> to exit both regular and walk-in customers
+                            </p>
+                            {/* Render the grid with interactive capabilities for staff */}
+                            <ParkingGrid 
+                                slots={sortedParkingSlots} 
+                                onSlotClick={handleSlotClick}
+                                isAdmin={false}
+                            />
                         </div>
                     </div>
 
                     {/* Staff Actions Section */}
-                    <div className="lg:col-span-1">
+                    <div className="lg:col-span-1 space-y-6">
                         <WalkInRegistrationForm onRegisterWalkIn={handleRegisterWalkIn} />
-                        {/* We can re-add the WalkInCustomerList here if needed */}
+                        {/* Add the WalkInCustomerList to show registered walk-ins */}
+                        <WalkInCustomerList customers={walkInCustomers} />
                     </div>
                 </main>
             </div>

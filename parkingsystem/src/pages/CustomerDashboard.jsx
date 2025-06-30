@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../db/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import ParkingGrid from '../components/ParkingGrid';
+import ParkingStats from '../components/ParkingStats';
 
 const CustomerDashboard = () => {
     const { user, logout } = useAuth();
@@ -69,6 +70,9 @@ const CustomerDashboard = () => {
                         Logout
                     </button>
                 </header>
+
+                {/* Parking Statistics Cards */}
+                <ParkingStats slots={sortedParkingSlots} />
 
                 <main>
                     <div className="p-6 bg-white rounded-lg shadow-md">
