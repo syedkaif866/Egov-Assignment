@@ -6,12 +6,11 @@ const RegisterPage = () => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [vehicleNumber, setVehicleNumber] = useState('');
     const { register } = useAuth();
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        register({ name, email, password, vehicleNumber });
+        register({ name, email, password });
     };
 
     return (
@@ -32,12 +31,10 @@ const RegisterPage = () => {
                         <input type="password" id="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-3 py-2 border rounded-lg" required />
                     </div>
                     <div className="mb-6">
-                        <label className="block text-gray-700 mb-2" htmlFor="vehicleNumber">Vehicle Number</label>
-                        <input type="text" id="vehicleNumber" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} className="w-full px-3 py-2 border rounded-lg" required />
+                        <button type="submit" className="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">
+                            Register
+                        </button>
                     </div>
-                    <button type="submit" className="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">
-                        Register
-                    </button>
                 </form>
                  <p className="text-center mt-4">
                     Already have an account? <Link to="/login" className="text-blue-500 hover:underline">Login here</Link>

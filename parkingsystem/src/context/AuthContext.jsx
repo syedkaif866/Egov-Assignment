@@ -3,7 +3,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { db } from "../db/db"
 import { useNavigate } from 'react-router-dom';
-import { normalizeVehicleNumber } from '../utils/vehicle'; // <-- IMPORT THE UTILITY
 
 const AuthContext = createContext();
 
@@ -61,14 +60,8 @@ export const AuthProvider = ({ children }) => {
 
     const register = async (userData) => {
         // Basic validation
-        if (!userData.name || !userData.email || !userData.password || !userData.vehicleNumber) {
-            alert('All fields are required for customer registration!');
-            return;
-        }
-
-        const normalizedVehicleNo = normalizeVehicleNumber(userData.vehicleNumber);
-        if (!normalizedVehicleNo) {
-            alert('Invalid vehicle number format. Please enter a valid vehicle number.');
+        if (!userData.name || !userData.email || !userData.password) {
+            alert('Name, email, and password are required for customer registration!');
             return;
         }
 
@@ -80,18 +73,11 @@ export const AuthProvider = ({ children }) => {
                 return;
             }
 
-            // Check for existing vehicle
-            const existingVehicle = await db.users.where('vehicleNumber').equals(normalizedVehicleNo).first();
-            if (existingVehicle) {
-                alert(`Error: Vehicle number "${userData.vehicleNumber}" is already registered.`);
-                return;
-            }
-
             const newUser = {
                 name: userData.name,
                 email: userData.email,
                 password: userData.password,
-                vehicleNumber: normalizedVehicleNo, // <-- SAVE NORMALIZED VERSION
+                vehicleNumber: null, // No vehicle number stored for registered users
                 role: 'customer',
                 customerType: 'registered', // Set customer type on registration
                 mobileNumber: null // Or you could add this field to the registration form

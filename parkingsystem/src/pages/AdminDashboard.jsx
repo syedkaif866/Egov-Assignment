@@ -244,8 +244,8 @@ const AdminDashboard = () => {
                     console.log(`Freed ${customerSlots.length} parking slot(s) that were booked by the deleted customer.`);
                 }
 
-                // 2. If this is a walk-in customer, move to deletedusers table
-                if (customer && customer.customerType === 'walk-in') {
+                // 2. Move customer to deletedusers table (for both walk-in and registered customers)
+                if (customer) {
                     await db.deletedusers.add({
                         originalId: customer.id,
                         name: customer.name,
@@ -256,15 +256,13 @@ const AdminDashboard = () => {
                         deletedAt: new Date(),
                         deletedBy: user?.name || 'Admin',
                     });
-                    console.log(`Walk-in customer ${customer.name} moved to deleted users table by admin`);
+                    console.log(`${customer.customerType} customer ${customer.name} moved to deleted users table by admin`);
                 }
 
                 // 3. Delete the customer from users table
                 await db.users.delete(customerId);
                 
-                const deletionMessage = customer && customer.customerType === 'walk-in' 
-                    ? `Walk-in customer deleted and moved to deleted users archive!`
-                    : `Customer deleted successfully!`;
+                const deletionMessage = `Customer deleted and moved to deleted users archive!`;
                 
                 if (customerSlots.length > 0) {
                     alert(`${deletionMessage} ${customerSlots.length} parking slot(s) have been freed up.`);

@@ -23,6 +23,7 @@ const WalkInCustomerList = ({ customers }) => {
                     <li key={customer.id} className="p-2 bg-gray-50 rounded">
                         Vehicle: <span className="font-mono">{customer.vehicleNumber}</span> | 
                         Mobile: <span className="font-mono">{customer.mobileNumber}</span>
+                        Registered by: <span className="font-mono">{customer.registeredBy || 'Unknown'}</span>
                     </li>
                 ))}
             </ul>
@@ -60,9 +61,17 @@ const StaffDashboard = () => {
         }
 
         try {
+            // Check if vehicle is already registered in users table (for walk-in customers)
             const existingVehicle = await db.users.where('vehicleNumber').equals(normalizedVehicleNo).first();
             if (existingVehicle) {
-                alert(`Error: Vehicle number "${vehicleNumber}" is already registered.`);
+                alert(`Error: Vehicle number "${vehicleNumber}" is already registered as a ${existingVehicle.customerType} customer.`);
+                return;
+            }
+
+            // Check if vehicle is currently parked (by any registered or walk-in user)
+            const currentlyParked = await db.parkingSlots.where('vehicleNumber').equals(normalizedVehicleNo).first();
+            if (currentlyParked && currentlyParked.status === 'occupied') {
+                alert(`Error: Vehicle number "${vehicleNumber}" is currently parked in slot ${currentlyParked.slotNumber}. Cannot register the same vehicle while it's already parked.`);
                 return;
             }
 
@@ -74,6 +83,7 @@ const StaffDashboard = () => {
                 customerType: 'walk-in',
                 vehicleNumber: normalizedVehicleNo,
                 mobileNumber: mobileNumber,
+                registeredBy: user.name,
             };
 
             await db.users.add(newUser);
@@ -213,7 +223,8 @@ const StaffDashboard = () => {
                 });
             }
 
-            // If this is a walk-in customer, move them to deletedusers table
+            // If this is a walk-in customer, move them to deletedusers table and delete them
+            // If this is a registered customer, just clear the slot (keep the user account)
             if (customer && customer.customerType === 'walk-in') {
                 try {
                     // Add to deletedusers table
@@ -228,7 +239,7 @@ const StaffDashboard = () => {
                         deletedBy: user?.name || 'Staff', // Track who deleted the customer
                     });
 
-                    // Remove from users table
+                    // Remove walk-in customer from users table
                     await db.users.delete(customer.id);
                     
                     console.log(`Walk-in customer ${customer.name} moved to deleted users table by ${user?.name}`);
@@ -237,6 +248,7 @@ const StaffDashboard = () => {
                     // Continue with slot clearing even if this fails
                 }
             }
+            // For registered customers, we don't delete their account - just clear the slot
 
             // Clear the slot
             await db.parkingSlots.update(slot.id, {
@@ -248,7 +260,7 @@ const StaffDashboard = () => {
 
             const exitMessage = customer && customer.customerType === 'walk-in' 
                 ? `Slot ${slot.slotNumber} has been freed up successfully!${durationText}\n\nWalk-in customer ${customer.name} has been checked out and removed from the system.`
-                : `Slot ${slot.slotNumber} has been freed up successfully!${durationText}`;
+                : `Slot ${slot.slotNumber} has been freed up successfully!${durationText}\n\n${customer && customer.customerType === 'registered' ? `Registered customer ${customer.name} has been checked out. Their account remains active.` : ''}`;
             
             alert(exitMessage);
         } catch (error) {

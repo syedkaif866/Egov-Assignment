@@ -11,8 +11,18 @@ const CustomerList = ({ customers, onDeleteCustomer }) => {
                         <li key={customer.id} className="p-3 bg-gray-50 rounded-md flex justify-between items-center">
                             <div>
                                 <p className="font-medium text-gray-800">{customer.name}</p>
-                                <p className="text-sm text-gray-500">Vehicle: <span className="font-mono">{customer.vehicleNumber}</span></p>
-                                <p className="text-xs text-gray-400 capitalize">{customer.customerType} Customer</p>
+                                {customer.customerType === 'walk-in' ? (
+                                    <>
+                                        <p className="text-sm text-gray-500">Vehicle: <span className="font-mono">{customer.vehicleNumber}</span></p>
+                                        <p className="text-xs text-gray-400 capitalize">{customer.customerType} Customer</p>
+                                        <p className="text-xs text-gray-400">Registered by: <span className="font-mono">{customer.registeredBy || 'Unknown'}</span></p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="text-sm text-gray-500">Email: <span className="font-mono">{customer.email}</span></p>
+                                        <p className="text-xs text-gray-400 capitalize">{customer.customerType} Customer</p>
+                                    </>
+                                )}
                             </div>
                             <button
                                 onClick={() => onDeleteCustomer(customer.id)}

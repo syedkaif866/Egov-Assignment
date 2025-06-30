@@ -3,11 +3,11 @@ import Dexie from 'dexie';
 
 export const db = new Dexie('parkingAppDB');
 
-db.version(5).stores({
-  users: '++id, &email, &vehicleNumber, role, mobileNumber, customerType',
+db.version(6).stores({
+  users: '++id, &email, vehicleNumber, role, mobileNumber, customerType',
   parkingSlots: '++id, &slotNumber, status, bookedByUserId, vehicleNumber, entryTime',
   parkingHistory: '++id, slotId, vehicleNumber, entryTime, exitTime',
-  deletedusers: '++id, originalId, name, email, vehicleNumber, mobileNumber, customerType, deletedAt',
+  deletedusers: '++id, originalId, name, email, vehicleNumber, mobileNumber, customerType, deletedAt,deletedBy',
 });
 
 // Seed an initial Admin user if one doesn't exist
