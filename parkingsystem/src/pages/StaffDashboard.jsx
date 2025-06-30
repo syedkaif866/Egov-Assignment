@@ -32,7 +32,7 @@ const WalkInCustomerList = ({ customers }) => {
 };
 
 const StaffDashboard = () => {
-    const { user, logout } = useAuth();
+    const { user } = useAuth();
 
     // --- 5. FETCH AND SORT PARKING SLOTS (same logic as AdminDashboard) ---
     const rawParkingSlots = useLiveQuery(() => db.parkingSlots.toArray());
@@ -320,16 +320,13 @@ const StaffDashboard = () => {
 
     // --- 7. UPDATE the JSX to the new two-column layout ---
     return (
-        <div className="min-h-screen bg-gray-100 p-4 sm:p-6 lg:p-8">
-            <div className="max-w-7xl mx-auto">
-                <header className="flex justify-between items-center mb-8">
+        <div className="min-h-screen bg-gray-100">
+            <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+                <header className="mb-8">
                     <div>
                         <h1 className="text-3xl font-bold text-gray-800">Staff Dashboard</h1>
                         <p className="text-gray-600 mt-1">Welcome, {user?.name}!</p>
                     </div>
-                    <button onClick={logout} className="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600 transition">
-                        Logout
-                    </button>
                 </header>
 
                 {/* Parking Statistics Cards */}
