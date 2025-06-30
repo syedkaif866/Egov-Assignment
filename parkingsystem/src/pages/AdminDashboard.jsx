@@ -6,20 +6,18 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import RegisterStaffForm from '../components/RegisterStaffForm';
 import StaffList from '../components/StaffList';
 import ParkingGrid from '../components/ParkingGrid';
+import CustomerList from '../components/CustomerList';
+import ParkingStats from '../components/ParkingStats';
 
 const AdminDashboard = () => {
     const { user, logout } = useAuth();
 
-    // This query for staff members is existing code
-    const staffMembers = useLiveQuery(
-        () => db.users.where('role').equals('staff').toArray()
-    );
+     // --- QUERIES FOR DATA ---
+    const staffMembers = useLiveQuery(() => db.users.where('role').equals('staff').toArray());
+    const rawParkingSlots = useLiveQuery(() => db.parkingSlots.toArray());
+    // --- NEW: Add a live query to get all customers ---
+    const customers = useLiveQuery(() => db.users.where('role').equals('customer').toArray());
 
-    // --- NEW: Add a live query to get all parking slots ---
-    // We order them by 'slotNumber' to ensure a consistent display
-   const rawParkingSlots = useLiveQuery(() => 
-        db.parkingSlots.toArray()
-    );
 
     // --- 3. CREATE a correctly sorted list using useMemo ---
     const sortedParkingSlots = useMemo(() => {
@@ -60,13 +58,28 @@ const AdminDashboard = () => {
 
     const handleAddSlot = async () => {
         try {
-            // Find the highest existing slot number to determine the next one
-            const lastSlot = await db.parkingSlots.orderBy('id').last();
-            let newSlotNumber = 'P1';
+            // Get all existing slots and find the highest P-series number
+            const allSlots = await db.parkingSlots.toArray();
+            let maxPNumber = 0;
             
-            if (lastSlot && lastSlot.slotNumber.startsWith('P')) {
-                const lastNum = parseInt(lastSlot.slotNumber.slice(1));
-                newSlotNumber = `P${lastNum + 1}`;
+            // Find the highest P-series slot number
+            allSlots.forEach(slot => {
+                if (slot.slotNumber.startsWith('P')) {
+                    const num = parseInt(slot.slotNumber.slice(1));
+                    if (!isNaN(num) && num > maxPNumber) {
+                        maxPNumber = num;
+                    }
+                }
+            });
+            
+            // Generate the next P-series slot number
+            const newSlotNumber = `P${maxPNumber + 1}`;
+            
+            // Double-check that this slot doesn't exist (extra safety)
+            const existingSlot = await db.parkingSlots.where('slotNumber').equals(newSlotNumber).first();
+            if (existingSlot) {
+                alert(`Error: Slot ${newSlotNumber} already exists. Please use "Add Custom Slot" instead.`);
+                return;
             }
 
             // Add the new slot to the database
@@ -77,9 +90,56 @@ const AdminDashboard = () => {
                 vehicleNumber: null,
                 entryTime: null,
             });
+            alert(`Slot ${newSlotNumber} added successfully!`);
         } catch (error) {
             console.error("Failed to add slot:", error);
-            alert("Failed to add slot. It might already exist. Check console for details.");
+            if (error.name === 'ConstraintError') {
+                alert("Failed to add slot: A slot with this number already exists.");
+            } else {
+                alert(`Failed to add slot: ${error.message}`);
+            }
+        }
+    };
+
+    const handleAddCustomSlot = async () => {
+        const slotNumber = prompt("Enter the slot number (e.g., P15, A1, B2):");
+        
+        if (!slotNumber) {
+            return; // User cancelled
+        }
+
+        const trimmedSlotNumber = slotNumber.trim().toUpperCase();
+        
+        if (!trimmedSlotNumber) {
+            alert("Please enter a valid slot number.");
+            return;
+        }
+
+        try {
+            const existingSlot = await db.parkingSlots.where('slotNumber').equals(trimmedSlotNumber).first();
+            
+            if (existingSlot) {
+                alert(`Error: Slot number "${trimmedSlotNumber}" already exists.`);
+                return;
+            }
+
+            // Add the new slot to the database
+            await db.parkingSlots.add({
+                slotNumber: trimmedSlotNumber,
+                status: 'available',
+                bookedByUserId: null,
+                vehicleNumber: null,
+                entryTime: null,
+            });
+            
+            alert(`Slot ${trimmedSlotNumber} added successfully!`);
+        } catch (error) {
+            console.error("Failed to add custom slot:", error);
+            if (error.name === 'ConstraintError') {
+                alert(`Failed to add slot: Slot "${trimmedSlotNumber}" already exists.`);
+            } else {
+                alert(`Failed to add slot: ${error.message}`);
+            }
         }
     };
     
@@ -97,15 +157,63 @@ const AdminDashboard = () => {
                 console.error("Failed to delete last slot:", error);
             }
         }
-    }
+    };
+
+    const handleToggleSlotStatus = async (id) => {
+        const slotToToggle = await db.parkingSlots.get(id);
+        if (slotToToggle && slotToToggle.status !== 'occupied') {
+            try {
+                const newStatus = slotToToggle.status === 'available' ? 'maintenance' : 'available';
+                await db.parkingSlots.update(id, { status: newStatus });
+                alert(`Slot status changed to ${newStatus}.`);
+            } catch (error) {
+                console.error("Failed to toggle slot status:", error);
+                alert("An error occurred while toggling the slot status.");
+            }
+        } else {
+            alert("You can't change the status of an occupied slot.");
+        }
+    };
 
     // This function is for the 'X' on each individual slot
     const handleDeleteSlot = async (id) => {
         if (window.confirm("Are you sure you want to delete this specific slot?")) {
+            const slotToDelete = await db.parkingSlots.get(id);
+            if (slotToDelete && slotToDelete.status === 'available') {
+                try {
+                    await db.parkingSlots.delete(id);
+                } catch (error) {
+                    console.error("Failed to delete slot:", error);
+                }
+            } else {
+                alert("You can't delete an occupied slot. Please free it first.");
+            }
+        }
+    };
+
+
+     const handleDeleteStaff = async (staffId) => {
+        if (window.confirm("Are you sure you want to delete this staff member? This action cannot be undone.")) {
             try {
-                await db.parkingSlots.delete(id);
+                await db.users.delete(staffId);
+                alert("Staff member deleted successfully.");
             } catch (error) {
-                console.error("Failed to delete slot:", error);
+                console.error("Failed to delete staff member:", error);
+                alert("An error occurred while deleting the staff member.");
+            }
+        }
+    };
+
+    // --- NEW: Function to delete a customer ---
+    const handleDeleteCustomer = async (customerId) => {
+        // A future improvement: check if the customer has an active booking and handle it.
+        if (window.confirm("Are you sure you want to delete this customer? This will not affect past parking history but cannot be undone.")) {
+            try {
+                await db.users.delete(customerId);
+                alert("Customer deleted successfully.");
+            } catch (error) {
+                console.error("Failed to delete customer:", error);
+                alert("An error occurred while deleting the customer.");
             }
         }
     };
@@ -125,6 +233,9 @@ const AdminDashboard = () => {
                     </button>
                 </header>
 
+                {/* Parking Statistics Cards */}
+                <ParkingStats slots={sortedParkingSlots} />
+
                 {/* New two-column layout for better organization */}
                 <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     
@@ -134,7 +245,8 @@ const AdminDashboard = () => {
                             <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-2xl font-bold text-gray-800">Parking Layout</h2>
                                 <div className="space-x-2">
-                                    <button onClick={handleAddSlot} className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">Add New Slot</button>
+                                    <button onClick={handleAddSlot} className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">Add Next Slot</button>
+                                    <button onClick={handleAddCustomSlot} className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">Add Custom Slot</button>
                                     <button onClick={handleDeleteLastSlot} className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">Delete Last</button>
                                 </div>
                             </div>
@@ -142,14 +254,18 @@ const AdminDashboard = () => {
                                 slots={sortedParkingSlots}
                                 isAdmin={true}
                                 onDeleteSlot={handleDeleteSlot}
+                               onToggleStatus={handleToggleSlotStatus}
                             />
                         </div>
                     </div>
 
                     {/* Staff Management Section (takes up 1/3 of the width on large screens) */}
-                    <div className="lg:col-span-1">
+                    <div className="lg:col-span-1 space-y-6">
                         <RegisterStaffForm onRegisterStaff={handleRegisterStaff} />
-                        <StaffList staffMembers={staffMembers} />
+                        {/* Pass the delete handler to the StaffList component */}
+                        <StaffList staffMembers={staffMembers} onDeleteStaff={handleDeleteStaff} />
+                        {/* --- NEW: Add the CustomerList to the UI --- */}
+                        <CustomerList customers={customers} onDeleteCustomer={handleDeleteCustomer} />
                     </div>
                 </main>
             </div>

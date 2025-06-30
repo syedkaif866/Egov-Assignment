@@ -2,19 +2,38 @@
 import React from 'react';
 
 // --- UPDATE 1: Add 'onSlotClick' to the list of props for ParkingSlot ---
-const ParkingSlot = ({ slot, isAdmin, onDelete, onSlotClick }) => {
+const ParkingSlot = ({ slot, isAdmin, onDelete, onSlotClick, onToggleStatus }) => {
     
-    // --- UPDATE 2: Add hover styles and cursor for 'available' slots ---
-    const statusStyles = {
-        available: 'bg-green-100 border-green-400 text-green-800 hover:bg-green-200 cursor-pointer',
-        occupied: 'bg-red-100 border-red-400 text-red-800',
-        maintenance: 'bg-yellow-100 border-yellow-400 text-yellow-800',
+    // --- UPDATE 2: Add hover styles and cursor for clickable slots ---
+    const getSlotStyles = () => {
+        const baseStyles = {
+            available: 'bg-green-100 border-green-400 text-green-800',
+            occupied: 'bg-red-100 border-red-400 text-red-800',
+            maintenance: 'bg-yellow-100 border-yellow-400 text-yellow-800',
+        };
+        
+        let styles = baseStyles[slot.status] || 'bg-gray-100 border-gray-400';
+        
+        // Add hover and cursor styles for clickable slots
+        if ((isAdmin && onToggleStatus) || (onSlotClick && slot.status === 'available')) {
+            if (slot.status === 'available') {
+                styles += ' hover:bg-green-200 cursor-pointer';
+            } else if (slot.status === 'maintenance' && isAdmin) {
+                styles += ' hover:bg-yellow-200 cursor-pointer';
+            }
+        }
+        
+        return styles;
     };
 
     // --- UPDATE 3: Create a handleClick function ---
     const handleClick = () => {
-        // Only trigger the click function if it exists AND the slot is available
-        if (onSlotClick && slot.status === 'available') {
+        // If it's an admin/staff with toggle functionality
+        if (onToggleStatus && isAdmin) {
+            onToggleStatus(slot.id);
+        }
+        // If it's a customer with slot selection functionality and slot is available
+        else if (onSlotClick && slot.status === 'available') {
             onSlotClick(slot);
         }
     };
@@ -23,7 +42,7 @@ const ParkingSlot = ({ slot, isAdmin, onDelete, onSlotClick }) => {
         // --- UPDATE 4: Add the onClick handler to the main div ---
         <div
             onClick={handleClick}
-            className={`p-4 border-2 rounded-lg shadow-md flex flex-col justify-between items-center relative transition-colors duration-200 ${statusStyles[slot.status] || 'bg-gray-100 border-gray-400'}`}
+            className={`p-4 border-2 rounded-lg shadow-md flex flex-col justify-between items-center relative transition-colors duration-200 ${getSlotStyles()}`}
         >
             <div className="text-2xl font-bold">{slot.slotNumber}</div>
             <div className="text-sm font-medium capitalize">{slot.status}</div>
@@ -53,7 +72,7 @@ const ParkingSlot = ({ slot, isAdmin, onDelete, onSlotClick }) => {
 };
 
 // --- UPDATE 7: Add 'onSlotClick' to the props for ParkingGrid ---
-const ParkingGrid = ({ slots, isAdmin = false, onDeleteSlot = () => {}, onSlotClick = null }) => {
+const ParkingGrid = ({ slots, isAdmin = false, onDeleteSlot = () => {}, onSlotClick = null, onToggleStatus = null }) => {
     if (!slots) {
         return <div className="text-center p-8">Loading parking slots...</div>;
     }
@@ -82,6 +101,7 @@ const ParkingGrid = ({ slots, isAdmin = false, onDeleteSlot = () => {}, onSlotCl
                     onDelete={onDeleteSlot}
                     // --- UPDATE 8: Pass the onSlotClick prop down to each ParkingSlot ---
                     onSlotClick={onSlotClick}
+                    onToggleStatus={onToggleStatus}
                 />
             ))}
         </div>

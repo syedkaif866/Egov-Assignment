@@ -6,6 +6,7 @@ import { db } from '../db/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { normalizeVehicleNumber } from '../utils/vehicle'; // --- 3. IMPORT normalization function ---
 import ParkingGrid from '../components/ParkingGrid';
+import ParkingStats from '../components/ParkingStats';
 
 // A new component to show the list of walk-ins
 const WalkInCustomerList = ({ customers }) => {
@@ -161,6 +162,9 @@ const StaffDashboard = () => {
                         Logout
                     </button>
                 </header>
+
+                {/* Parking Statistics Cards */}
+                <ParkingStats slots={sortedParkingSlots} />
 
                 <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Parking Grid Section */}

@@ -47,7 +47,7 @@ const RegisterStaffForm = ({ onRegisterStaff }) => {
                     />
                 </div>
                 <div>
-                    <label className="block text-gray-700 mb-1" htmlFor="staff-password">Temporary Password</label>
+                    <label className="block text-gray-700 mb-1" htmlFor="staff-password">Password</label>
                     <input
                         type="password"
                         id="staff-password"
