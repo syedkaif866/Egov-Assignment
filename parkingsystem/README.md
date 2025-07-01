@@ -37,9 +37,13 @@
 ### Steps to Run
 1. **Open Terminal/Command Prompt** in the project folder
 2. **Install Dependencies**: Run this command to download all required packages
-   ```   npm install
+   ```
+   npm install
+   ```
 3. **Start the Application**: Run this command to start the parking system
+   ```
    npm run dev
+   ```
 4. **Open in Browser**: The system will start and show you a web address (usually http://localhost:5173)
 5. **Login**: Use the default admin account:
    - Email: `admin@gmail.com`
