@@ -1,11 +1,11 @@
-// src/pages/CustomerDashboard.jsx
 import React, { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../db/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { normalizeVehicleNumber } from '../utils/vehicle';
 import ParkingGrid from '../components/ParkingGrid';
-
+import toast from 'react-hot-toast';
+import Swal from 'sweetalert2';
 
 const CustomerDashboard = () => {
     const { user } = useAuth();
@@ -110,12 +110,26 @@ const CustomerDashboard = () => {
                 (slot) => slot.bookedByUserId === user.id
             );
             if (userHasBooking) {
-                alert("You already have an active parking booking. You can only book one slot at a time.");
+                toast.error("You already have an active parking booking. You can only book one slot at a time.");
                 return;
             }
 
             // 2. Prompt for vehicle number
-            const vehicleNumber = prompt("Please enter your vehicle number:");
+            const { value: vehicleNumber } = await Swal.fire({
+                title: 'Enter Vehicle Number',
+                text: `Enter your vehicle number for slot ${slotToBook.slotNumber}:`,
+                input: 'text',
+                inputPlaceholder: 'e.g., ABC123, KA01AB1234',
+                showCancelButton: true,
+                confirmButtonText: 'Book Slot',
+                cancelButtonText: 'Cancel',
+                inputValidator: (value) => {
+                    if (!value) {
+                        return 'Please enter your vehicle number';
+                    }
+                }
+            });
+            
             if (!vehicleNumber) {
                 return; // User cancelled
             }
@@ -123,7 +137,7 @@ const CustomerDashboard = () => {
             // 3. Validate and normalize vehicle number
             const normalizedVehicleNumber = normalizeVehicleNumber(vehicleNumber);
             if (!normalizedVehicleNumber) {
-                alert('Invalid vehicle number format. Please enter a valid vehicle number.');
+                toast.error('Invalid vehicle number format. Please enter a valid vehicle number.');
                 return;
             }
 
@@ -132,19 +146,34 @@ const CustomerDashboard = () => {
                 (slot) => slot.status === 'occupied' && slot.vehicleNumber === normalizedVehicleNumber
             );
             if (vehicleAlreadyParked) {
-                alert(`Vehicle ${vehicleNumber} is already parked in the system.`);
+                toast.error(`Vehicle ${vehicleNumber} is already parked in the system.`);
                 return;
             }
 
             // 5. Check if vehicle is registered as a walk-in customer
             const existingWalkInVehicle = await db.users.where('vehicleNumber').equals(normalizedVehicleNumber).first();
             if (existingWalkInVehicle && existingWalkInVehicle.customerType === 'walk-in') {
-                alert(`Vehicle ${vehicleNumber} is already registered as a walk-in customer. Please contact staff for assistance.`);
+                toast.error(`Vehicle ${vehicleNumber} is already registered as a walk-in customer. Please contact staff for assistance.`);
                 return;
             }
 
             // 6. Confirmation dialog
-            if (!window.confirm(`Are you sure you want to book slot ${slotToBook.slotNumber} for vehicle ${vehicleNumber}?`)) {
+            const confirmResult = await Swal.fire({
+                title: 'Confirm Booking',
+                html: `
+                    <div class="text-left">
+                        <p><strong>Slot:</strong> ${slotToBook.slotNumber}</p>
+                        <p><strong>Vehicle:</strong> ${vehicleNumber}</p>
+                        <p class="mt-2 text-sm text-gray-600">Are you sure you want to book this parking slot?</p>
+                    </div>
+                `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Book Slot',
+                cancelButtonText: 'Cancel'
+            });
+
+            if (!confirmResult.isConfirmed) {
                 return;
             }
 
@@ -156,10 +185,10 @@ const CustomerDashboard = () => {
                 entryTime: new Date(), // Record the time of entry
             });
 
-            alert(`Slot ${slotToBook.slotNumber} booked successfully for vehicle ${vehicleNumber}!`);
+            toast.success(`Slot ${slotToBook.slotNumber} booked successfully for vehicle ${vehicleNumber}!`);
         } catch (error) {
             console.error("Failed to book slot:", error);
-            alert("There was an error booking the slot. Please try again.");
+            toast.error("There was an error booking the slot. Please try again.");
         }
     };
 

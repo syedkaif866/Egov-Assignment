@@ -1,4 +1,3 @@
-// src/components/ParkingHistory.jsx
 import React, { useState, useEffect } from 'react';
 import { db } from '../db/db';
 import { useLiveQuery } from 'dexie-react-hooks';

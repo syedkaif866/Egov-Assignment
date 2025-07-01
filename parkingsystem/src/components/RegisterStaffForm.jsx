@@ -1,4 +1,3 @@
-// src/components/RegisterStaffForm.jsx
 import React, { useState } from 'react';
 
 const RegisterStaffForm = ({ onRegisterStaff }) => {

@@ -1,10 +1,5 @@
 import React, { useState } from 'react';
 
-/**
- * A form for staff to register walk-in customers.
- * It takes one prop:
- * @param {function} onRegisterWalkIn - A function that will be called with the customer data when the form is submitted.
- */
 const WalkInRegistrationForm = ({ onRegisterWalkIn }) => {
     const [vehicleNumber, setVehicleNumber] = useState('');
     const [mobileNumber, setMobileNumber] = useState('');

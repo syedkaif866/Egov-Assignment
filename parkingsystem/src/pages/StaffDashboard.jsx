@@ -1,13 +1,22 @@
-// src/pages/StaffDashboard.jsx
 import React ,{ useMemo }from 'react';
 import { useAuth } from '../context/AuthContext';
 import WalkInRegistrationForm from '../components/WalkInRegistrationForm';
 import { db } from '../db/db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { normalizeVehicleNumber } from '../utils/vehicle'; // --- 3. IMPORT normalization function ---
+import { normalizeVehicleNumber } from '../utils/vehicle';
 import ParkingGrid from '../components/ParkingGrid';
 import ParkingStats from '../components/ParkingStats';
 import ParkingHistory from '../components/ParkingHistory';
+import Swal from 'sweetalert2';
+
+// Initialize SweetAlert2 with React content
+const MySwal = Swal.mixin({
+    customClass: {
+        confirmButton: 'bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2',
+        cancelButton: 'bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded'
+    },
+    buttonsStyling: false
+});
 
 // A new component to show the list of walk-ins
 const WalkInCustomerList = ({ customers }) => {
@@ -56,7 +65,12 @@ const StaffDashboard = () => {
         const normalizedVehicleNo = normalizeVehicleNumber(vehicleNumber);
 
         if (!normalizedVehicleNo) {
-            alert('Invalid vehicle number format. Please enter a valid vehicle number.');
+            MySwal.fire({
+                icon: 'error',
+                title: 'Invalid Vehicle Number',
+                text: 'Please enter a valid vehicle number format.',
+                confirmButtonText: 'OK'
+            });
             return;
         }
 
@@ -64,14 +78,24 @@ const StaffDashboard = () => {
             // Check if vehicle is already registered in users table (for walk-in customers)
             const existingVehicle = await db.users.where('vehicleNumber').equals(normalizedVehicleNo).first();
             if (existingVehicle) {
-                alert(`Error: Vehicle number "${vehicleNumber}" is already registered as a ${existingVehicle.customerType} customer.`);
+                MySwal.fire({
+                    icon: 'error',
+                    title: 'Vehicle Already Registered',
+                    text: `Vehicle number "${vehicleNumber}" is already registered as a ${existingVehicle.customerType} customer.`,
+                    confirmButtonText: 'OK'
+                });
                 return;
             }
 
             // Check if vehicle is currently parked (by any registered or walk-in user)
             const currentlyParked = await db.parkingSlots.where('vehicleNumber').equals(normalizedVehicleNo).first();
             if (currentlyParked && currentlyParked.status === 'occupied') {
-                alert(`Error: Vehicle number "${vehicleNumber}" is currently parked in slot ${currentlyParked.slotNumber}. Cannot register the same vehicle while it's already parked.`);
+                MySwal.fire({
+                    icon: 'error',
+                    title: 'Vehicle Currently Parked',
+                    text: `Vehicle number "${vehicleNumber}" is currently parked in slot ${currentlyParked.slotNumber}. Cannot register the same vehicle while it's already parked.`,
+                    confirmButtonText: 'OK'
+                });
                 return;
             }
 
@@ -87,10 +111,20 @@ const StaffDashboard = () => {
             };
 
             await db.users.add(newUser);
-            alert(`Walk-in customer with vehicle "${normalizedVehicleNo}" registered successfully!`);
+            MySwal.fire({
+                icon: 'success',
+                title: 'Registration Successful',
+                text: `Walk-in customer with vehicle "${normalizedVehicleNo}" registered successfully!`,
+                confirmButtonText: 'OK'
+            });
         } catch (error) {
             console.error("Failed to register walk-in customer:", error);
-            alert("Registration failed. See console for details.");
+            MySwal.fire({
+                icon: 'error',
+                title: 'Registration Failed',
+                text: 'Registration failed. Please check the console for details.',
+                confirmButtonText: 'OK'
+            });
         }
     };
 
@@ -113,7 +147,12 @@ const StaffDashboard = () => {
     // --- NEW: Function to book a slot for walk-in customer ---
     const handleBookSlotForWalkIn = async (slot) => {
         if (!walkInCustomers || walkInCustomers.length === 0) {
-            alert('No walk-in customers available. Please register a walk-in customer first.');
+            MySwal.fire({
+                icon: 'warning',
+                title: 'No Walk-in Customers',
+                text: 'No walk-in customers available. Please register a walk-in customer first.',
+                confirmButtonText: 'OK'
+            });
             return;
         }
 
@@ -129,30 +168,57 @@ const StaffDashboard = () => {
         }
 
         if (availableWalkIns.length === 0) {
-            alert('All walk-in customers already have active parking bookings.');
+            MySwal.fire({
+                icon: 'warning',
+                title: 'No Available Walk-in Customers',
+                text: 'All walk-in customers already have active parking bookings.',
+                confirmButtonText: 'OK'
+            });
             return;
         }
 
         // Create a selection dialog
-        let customerList = 'Select a walk-in customer to book this slot:\n\n';
+        let customerOptions = {};
+        let customerListHtml = '<div class="text-left">';
         availableWalkIns.forEach((customer, index) => {
-            customerList += `${index + 1}. ${customer.vehicleNumber} (${customer.mobileNumber})\n`;
+            customerOptions[index + 1] = `${customer.vehicleNumber} (${customer.mobileNumber})`;
+            customerListHtml += `<div class="mb-2"><strong>${index + 1}.</strong> ${customer.vehicleNumber} (${customer.mobileNumber})</div>`;
         });
-        customerList += '\nEnter the number of your choice:';
+        customerListHtml += '</div>';
 
-        const choice = prompt(customerList);
+        const { value: choice } = await MySwal.fire({
+            title: 'Select Walk-in Customer',
+            html: customerListHtml + '<br><input type="number" id="customer-choice" class="swal2-input" placeholder="Enter customer number" min="1" max="' + availableWalkIns.length + '">',
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Select',
+            cancelButtonText: 'Cancel',
+            preConfirm: () => {
+                const choice = document.getElementById('customer-choice').value;
+                if (!choice || choice < 1 || choice > availableWalkIns.length) {
+                    MySwal.showValidationMessage('Please enter a valid customer number');
+                    return false;
+                }
+                return choice;
+            }
+        });
+
         if (!choice) return; // User cancelled
 
         const customerIndex = parseInt(choice) - 1;
-        if (customerIndex < 0 || customerIndex >= availableWalkIns.length) {
-            alert('Invalid selection. Please try again.');
-            return;
-        }
-
         const selectedCustomer = availableWalkIns[customerIndex];
 
         // Confirm the booking
-        if (!window.confirm(`Book slot ${slot.slotNumber} for vehicle ${selectedCustomer.vehicleNumber}?`)) {
+        const confirmResult = await MySwal.fire({
+            title: 'Confirm Booking',
+            text: `Book slot ${slot.slotNumber} for vehicle ${selectedCustomer.vehicleNumber}?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, Book Slot',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (!confirmResult.isConfirmed) {
             return;
         }
 
@@ -164,17 +230,32 @@ const StaffDashboard = () => {
                 entryTime: new Date(),
             });
 
-            alert(`Slot ${slot.slotNumber} booked successfully for walk-in customer ${selectedCustomer.vehicleNumber}!`);
+            MySwal.fire({
+                icon: 'success',
+                title: 'Slot Booked Successfully',
+                text: `Slot ${slot.slotNumber} booked successfully for walk-in customer ${selectedCustomer.vehicleNumber}!`,
+                confirmButtonText: 'OK'
+            });
         } catch (error) {
             console.error("Failed to book slot:", error);
-            alert("Failed to book slot. Please try again.");
+            MySwal.fire({
+                icon: 'error',
+                title: 'Booking Failed',
+                text: 'Failed to book slot. Please try again.',
+                confirmButtonText: 'OK'
+            });
         }
     };
 
     // --- NEW: Function to exit/free a booked slot ---
     const handleExitSlot = async (slot) => {
         if (slot.status !== 'occupied') {
-            alert('This slot is not currently occupied.');
+            MySwal.fire({
+                icon: 'warning',
+                title: 'Slot Not Occupied',
+                text: 'This slot is not currently occupied.',
+                confirmButtonText: 'OK'
+            });
             return;
         }
 
@@ -206,7 +287,21 @@ const StaffDashboard = () => {
         }
 
         // Confirm the exit
-        if (!window.confirm(`Free up slot ${slot.slotNumber}?\n\nCustomer: ${customerInfo}${durationText}\n\nThis will make the slot available for new bookings.`)) {
+        const exitConfirmResult = await MySwal.fire({
+            title: 'Confirm Exit',
+            html: `<div class="text-left">
+                <p><strong>Free up slot ${slot.slotNumber}?</strong></p>
+                <p><strong>Customer:</strong> ${customerInfo}</p>
+                ${durationText ? `<p><strong>Duration:</strong> ${durationText.replace('\n', '')}</p>` : ''}
+                <p class="mt-2">This will make the slot available for new bookings.</p>
+            </div>`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, Free Slot',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (!exitConfirmResult.isConfirmed) {
             return;
         }
 
@@ -262,59 +357,140 @@ const StaffDashboard = () => {
                 ? `Slot ${slot.slotNumber} has been freed up successfully!${durationText}\n\nWalk-in customer ${customer.name} has been checked out and removed from the system.`
                 : `Slot ${slot.slotNumber} has been freed up successfully!${durationText}\n\n${customer && customer.customerType === 'registered' ? `Registered customer ${customer.name} has been checked out. Their account remains active.` : ''}`;
             
-            alert(exitMessage);
+            MySwal.fire({
+                icon: 'success',
+                title: 'Slot Freed Successfully',
+                text: exitMessage,
+                confirmButtonText: 'OK'
+            });
         } catch (error) {
             console.error("Failed to exit slot:", error);
-            alert("Failed to free up the slot. Please try again.");
+            MySwal.fire({
+                icon: 'error',
+                title: 'Exit Failed',
+                text: 'Failed to free up the slot. Please try again.',
+                confirmButtonText: 'OK'
+            });
         }
     };
 
     // --- NEW: Function to handle maintenance slot operations ---
     const handleMaintenanceSlot = async (slot) => {
         if (slot.status !== 'maintenance') {
-            alert('This slot is not currently under maintenance.');
+            MySwal.fire({
+                icon: 'warning',
+                title: 'Slot Not Under Maintenance',
+                text: 'This slot is not currently under maintenance.',
+                confirmButtonText: 'OK'
+            });
             return;
         }
 
         // Create options for staff
-        const options = [
-            '1. Make slot available (remove maintenance status)',
-            '2. Delete this slot permanently',
-            '',
-            'Enter your choice (1 or 2):'
-        ].join('\n');
+        const { value: choice } = await MySwal.fire({
+            title: 'Maintenance Slot Options',
+            html: `
+                <div class="text-left">
+                    <p class="mb-3">What would you like to do with slot ${slot.slotNumber}?</p>
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="radio" name="maintenance-option" value="1" class="mr-2"> 
+                            Make slot available (remove maintenance status)
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="maintenance-option" value="2" class="mr-2"> 
+                            Delete this slot permanently
+                        </label>
+                    </div>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Proceed',
+            cancelButtonText: 'Cancel',
+            preConfirm: () => {
+                const selected = document.querySelector('input[name="maintenance-option"]:checked');
+                if (!selected) {
+                    MySwal.showValidationMessage('Please select an option');
+                    return false;
+                }
+                return selected.value;
+            }
+        });
 
-        const choice = prompt(options);
         if (!choice) return; // User cancelled
 
         const selectedOption = parseInt(choice);
 
         if (selectedOption === 1) {
             // Make slot available
-            if (window.confirm(`Make slot ${slot.slotNumber} available for booking?\n\nThis will remove the maintenance status and allow customers to book this slot.`)) {
+            const makeAvailableResult = await MySwal.fire({
+                title: 'Make Slot Available',
+                text: `Make slot ${slot.slotNumber} available for booking?\n\nThis will remove the maintenance status and allow customers to book this slot.`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Make Available',
+                cancelButtonText: 'Cancel'
+            });
+
+            if (makeAvailableResult.isConfirmed) {
                 try {
                     await db.parkingSlots.update(slot.id, {
                         status: 'available',
                     });
-                    alert(`Slot ${slot.slotNumber} is now available for booking!`);
+                    MySwal.fire({
+                        icon: 'success',
+                        title: 'Slot Available',
+                        text: `Slot ${slot.slotNumber} is now available for booking!`,
+                        confirmButtonText: 'OK'
+                    });
                 } catch (error) {
                     console.error("Failed to update slot status:", error);
-                    alert("Failed to update slot status. Please try again.");
+                    MySwal.fire({
+                        icon: 'error',
+                        title: 'Update Failed',
+                        text: 'Failed to update slot status. Please try again.',
+                        confirmButtonText: 'OK'
+                    });
                 }
             }
         } else if (selectedOption === 2) {
             // Delete slot permanently
-            if (window.confirm(`Delete slot ${slot.slotNumber} permanently?\n\nThis action cannot be undone. The slot will be completely removed from the system.`)) {
+            const deleteResult = await MySwal.fire({
+                title: 'Delete Slot Permanently',
+                text: `Delete slot ${slot.slotNumber} permanently?\n\nThis action cannot be undone. The slot will be completely removed from the system.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Delete Permanently',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#d33'
+            });
+
+            if (deleteResult.isConfirmed) {
                 try {
                     await db.parkingSlots.delete(slot.id);
-                    alert(`Slot ${slot.slotNumber} has been deleted permanently.`);
+                    MySwal.fire({
+                        icon: 'success',
+                        title: 'Slot Deleted',
+                        text: `Slot ${slot.slotNumber} has been deleted permanently.`,
+                        confirmButtonText: 'OK'
+                    });
                 } catch (error) {
                     console.error("Failed to delete slot:", error);
-                    alert("Failed to delete slot. Please try again.");
+                    MySwal.fire({
+                        icon: 'error',
+                        title: 'Delete Failed',
+                        text: 'Failed to delete slot. Please try again.',
+                        confirmButtonText: 'OK'
+                    });
                 }
             }
         } else {
-            alert('Invalid selection. Please choose 1 or 2.');
+            MySwal.fire({
+                icon: 'error',
+                title: 'Invalid Selection',
+                text: 'Invalid selection. Please choose a valid option.',
+                confirmButtonText: 'OK'
+            });
         }
     };
 

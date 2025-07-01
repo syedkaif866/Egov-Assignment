@@ -1,4 +1,3 @@
-// src/components/ParkingStats.jsx
 import React from 'react';
 
 const ParkingStats = ({ slots }) => {

@@ -1,4 +1,3 @@
-// src/pages/AdminDashboard.jsx
 import React,{ useMemo }  from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../db/db'; 
@@ -10,6 +9,7 @@ import CustomerList from '../components/CustomerList';
 import ParkingStats from '../components/ParkingStats';
 import DeletedUsersList from '../components/DeletedUsersList';
 import ParkingHistory from '../components/ParkingHistory';
+import toast from 'react-hot-toast';
 
 const AdminDashboard = () => {
     const { user } = useAuth();
@@ -46,15 +46,15 @@ const AdminDashboard = () => {
         try {
             const existingUser = await db.users.where('email').equals(email).first();
             if (existingUser) {
-                alert(`Error: A user with the email ${email} already exists.`);
+                toast.error(`Error: A user with the email ${email} already exists.`);
                 return;
             }
             const newStaff = { name, email, password, role: 'staff', vehicleNumber: `STAFF-${email}` };
             await db.users.add(newStaff);
-            alert(`Staff member "${name}" registered successfully!`);
+            toast.success(`Staff member "${name}" registered successfully!`);
         } catch (error) {
             console.error("Failed to register staff:", error);
-            alert("Failed to register staff. See console for details.");
+            toast.error(`Failed to register staff ${error}`);
         }
     };
 
@@ -82,7 +82,7 @@ const AdminDashboard = () => {
             // Double-check that this slot doesn't exist (extra safety)
             const existingSlot = await db.parkingSlots.where('slotNumber').equals(newSlotNumber).first();
             if (existingSlot) {
-                alert(`Error: Slot ${newSlotNumber} already exists. Please use "Add Custom Slot" instead.`);
+                toast.error(`Error: Slot ${newSlotNumber} already exists. Please use "Add Custom Slot" instead.`);
                 return;
             }
 
@@ -94,13 +94,13 @@ const AdminDashboard = () => {
                 vehicleNumber: null,
                 entryTime: null,
             });
-            alert(`Slot ${newSlotNumber} added successfully!`);
+            toast.success(`Slot ${newSlotNumber} added successfully!`);
         } catch (error) {
             console.error("Failed to add slot:", error);
             if (error.name === 'ConstraintError') {
-                alert("Failed to add slot: A slot with this number already exists.");
+                toast.error("Failed to add slot: A slot with this number already exists.");
             } else {
-                alert(`Failed to add slot: ${error.message}`);
+                toast.error(`Failed to add slot: ${error.message}`);
             }
         }
     };
@@ -115,7 +115,7 @@ const AdminDashboard = () => {
         const trimmedSlotNumber = slotNumber.trim().toUpperCase();
         
         if (!trimmedSlotNumber) {
-            alert("Please enter a valid slot number.");
+            toast.error("Please enter a valid slot number.");
             return;
         }
 
@@ -123,7 +123,7 @@ const AdminDashboard = () => {
             const existingSlot = await db.parkingSlots.where('slotNumber').equals(trimmedSlotNumber).first();
             
             if (existingSlot) {
-                alert(`Error: Slot number "${trimmedSlotNumber}" already exists.`);
+                toast.error(`Error: Slot number "${trimmedSlotNumber}" already exists.`);
                 return;
             }
 
@@ -135,14 +135,14 @@ const AdminDashboard = () => {
                 vehicleNumber: null,
                 entryTime: null,
             });
-            
-            alert(`Slot ${trimmedSlotNumber} added successfully!`);
+
+            toast.success(`Slot ${trimmedSlotNumber} added successfully!`);
         } catch (error) {
             console.error("Failed to add custom slot:", error);
             if (error.name === 'ConstraintError') {
-                alert(`Failed to add slot: Slot "${trimmedSlotNumber}" already exists.`);
+                toast.error(`Failed to add slot: Slot "${trimmedSlotNumber}" already exists.`);
             } else {
-                alert(`Failed to add slot: ${error.message}`);
+                toast.error(`Failed to add slot: ${error.message}`);
             }
         }
     };
@@ -155,10 +155,11 @@ const AdminDashboard = () => {
                 if (lastSlot) {
                     await db.parkingSlots.delete(lastSlot.id);
                 } else {
-                    alert("No slots to delete.");
+                    toast.error("No slots to delete.");
                 }
             } catch (error) {
                 console.error("Failed to delete last slot:", error);
+                toast.error("An error occurred while deleting the last slot.");
             }
         }
     };
@@ -169,13 +170,13 @@ const AdminDashboard = () => {
             try {
                 const newStatus = slotToToggle.status === 'available' ? 'maintenance' : 'available';
                 await db.parkingSlots.update(id, { status: newStatus });
-                alert(`Slot status changed to ${newStatus}.`);
+                toast.success(`Slot status changed to ${newStatus}.`);
             } catch (error) {
                 console.error("Failed to toggle slot status:", error);
-                alert("An error occurred while toggling the slot status.");
+                toast.error("An error occurred while toggling the slot status.");
             }
         } else {
-            alert("You can't change the status of an occupied slot.");
+            toast.error("You can't change the status of an occupied slot.");
         }
     };
 
@@ -188,9 +189,10 @@ const AdminDashboard = () => {
                     await db.parkingSlots.delete(id);
                 } catch (error) {
                     console.error("Failed to delete slot:", error);
+                    toast.error("An error occurred while deleting the slot.");
                 }
             } else {
-                alert("You can't delete an occupied slot. Please free it first.");
+                toast.error("You can't delete an occupied slot. Please free it first.");
             }
         }
     };
@@ -200,10 +202,10 @@ const AdminDashboard = () => {
         if (window.confirm("Are you sure you want to delete this staff member? This action cannot be undone.")) {
             try {
                 await db.users.delete(staffId);
-                alert("Staff member deleted successfully.");
+                toast.success("Staff member deleted successfully.");
             } catch (error) {
                 console.error("Failed to delete staff member:", error);
-                alert("An error occurred while deleting the staff member.");
+                toast.error("An error occurred while deleting the staff member.");
             }
         }
     };
@@ -265,13 +267,13 @@ const AdminDashboard = () => {
                 const deletionMessage = `Customer deleted and moved to deleted users archive!`;
                 
                 if (customerSlots.length > 0) {
-                    alert(`${deletionMessage} ${customerSlots.length} parking slot(s) have been freed up.`);
+                    toast.success(`${deletionMessage} ${customerSlots.length} parking slot(s) have been freed up.`);
                 } else {
-                    alert(deletionMessage);
+                    toast.success(deletionMessage);
                 }
             } catch (error) {
                 console.error("Failed to delete customer:", error);
-                alert("An error occurred while deleting the customer.");
+                toast.error("An error occurred while deleting the customer.");
             }
         }
     };

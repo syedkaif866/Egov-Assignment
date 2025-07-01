@@ -1,7 +1,7 @@
-// src/components/Navbar.js
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
 const Navbar = () => {
     const { user, logout } = useAuth();
@@ -14,6 +14,7 @@ const Navbar = () => {
     const handleLogout = () => {
         logout();
         setIsMobileMenuOpen(false);
+        toast.success('Logged out successfully!');
     };
 
     const toggleMobileMenu = () => {

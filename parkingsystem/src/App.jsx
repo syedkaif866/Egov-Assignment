@@ -10,20 +10,57 @@ import CustomerDashboard from './pages/CustomerDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 import { useAuth } from './context/AuthContext';
+import { Toaster } from 'react-hot-toast';
 
 function App() {
   const { user } = useAuth();
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navbar - shows only when user is logged in */}
       <Navbar />
       
+      <Toaster
+        position="top-right"
+        reverseOrder={false}
+        gutter={8}
+        containerClassName=""
+        containerStyle={{}}
+        toastOptions={{
+          className: '',
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            style: {
+              background: '#10B981',
+              color: '#fff',
+            },
+            iconTheme: {
+              primary: '#fff',
+              secondary: '#10B981',
+            },
+          },
+          error: {
+            duration: 4000,
+            style: {
+              background: '#EF4444',
+              color: '#fff',
+            },
+            iconTheme: {
+              primary: '#fff',
+              secondary: '#EF4444',
+            },
+          },
+        }}
+      />
+      
       <Routes>
-        {/* Home route - accessible to everyone */}
+       
         <Route path="/home" element={<Home />} />
       
-      {/* If user is logged in, redirect from root to their dashboard, else to home */}
       <Route path="/" element={user ? <Navigate to={`/${user.role}/dashboard`} /> : <Navigate to="/home" />} />
       
       <Route path="/login" element={<LoginPage />} />
@@ -55,7 +92,6 @@ function App() {
         } 
       />
 
-      {/* Catch-all route to redirect to home */}
       <Route path="*" element={<Navigate to="/home" />} />
     </Routes>
     </div>

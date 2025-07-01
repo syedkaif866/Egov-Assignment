@@ -1,4 +1,3 @@
-// src/components/ParkingGrid.jsx
 import React from 'react';
 
 // --- UPDATE 1: Add 'onSlotClick' and 'userRole' to the list of props for ParkingSlot ---

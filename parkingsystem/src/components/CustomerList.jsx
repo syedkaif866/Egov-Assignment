@@ -1,4 +1,3 @@
-// src/components/CustomerList.jsx
 import React from 'react';
 
 const CustomerList = ({ customers, onDeleteCustomer }) => {

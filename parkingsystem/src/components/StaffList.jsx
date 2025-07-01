@@ -1,7 +1,6 @@
-// src/components/StaffList.jsx
 import React from 'react';
 
-// Add 'onDeleteStaff' to the props
+
 const StaffList = ({ staffMembers, onDeleteStaff }) => {
     return (
         <div className="mt-8 p-6 bg-white rounded-lg shadow-md">

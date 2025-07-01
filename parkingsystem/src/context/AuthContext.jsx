@@ -1,8 +1,7 @@
-
-// src/context/AuthContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { db } from "../db/db"
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 const AuthContext = createContext();
 
@@ -11,7 +10,6 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
-    // Persist user session on page reload
     // Persist user session on page reload
     useEffect(() => {
         try {
@@ -25,7 +23,7 @@ export const AuthProvider = ({ children }) => {
             sessionStorage.removeItem('parkingUser'); // Clear corrupted data
         }
         setLoading(false);
-    }, []); // This useEffect is correct
+    }, []);
 
     // --- 2. UPDATE THE LOGIN FUNCTION WITH ROLE-BASED REDIRECTION ---
     const login = async (email, password) => {
@@ -54,14 +52,14 @@ export const AuthProvider = ({ children }) => {
         }
         
         // This 'else' is no longer needed
-        alert('Invalid email or password!');
+        toast.error('Invalid email or password!');
         return false; // Return false on failure
     };
 
     const register = async (userData) => {
         // Basic validation
         if (!userData.name || !userData.email || !userData.password) {
-            alert('Name, email, and password are required for customer registration!');
+            toast.error('Name, email, and password are required for customer registration!');
             return;
         }
 
@@ -69,7 +67,7 @@ export const AuthProvider = ({ children }) => {
             // Check if user already exists
             const existingUser = await db.users.where('email').equals(userData.email).first();
             if (existingUser) {
-                alert('User with this email already exists!');
+                toast.error('User with this email already exists!');
                 return;
             }
 
@@ -85,12 +83,12 @@ export const AuthProvider = ({ children }) => {
 
             await db.users.add(newUser);
 
-            alert('Registration successful! Please log in.');
+            toast.success('Registration successful! Please log in.');
             navigate('/login');
 
         } catch (error) {
             console.error("Registration failed:", error);
-            alert(`Registration failed. Please check the console for details.`);
+            toast.error(`Registration failed. Please check the console for details.`);
         }
     };
 
