@@ -10,6 +10,7 @@ import ParkingStats from '../components/ParkingStats';
 import DeletedUsersList from '../components/DeletedUsersList';
 import ParkingHistory from '../components/ParkingHistory';
 import toast from 'react-hot-toast';
+import Swal from 'sweetalert2';
 
 const AdminDashboard = () => {
     const { user } = useAuth();
@@ -41,7 +42,6 @@ const AdminDashboard = () => {
 
     // This function for registering staff is existing code
     const handleRegisterStaff = async (staffData) => {
-        // ... (your existing code for registering staff)
         const { name, email, password } = staffData;
         try {
             const existingUser = await db.users.where('email').equals(email).first();
@@ -106,18 +106,26 @@ const AdminDashboard = () => {
     };
 
     const handleAddCustomSlot = async () => {
-        const slotNumber = prompt("Enter the slot number (e.g., P15, A1, B2):");
+        const { value: slotNumber } = await Swal.fire({
+            title: 'Add Custom Slot',
+            text: 'Enter the slot number:',
+            input: 'text',
+            inputPlaceholder: 'e.g., P15, A1, B2',
+            showCancelButton: true,
+            confirmButtonText: 'Add Slot',
+            cancelButtonText: 'Cancel',
+            inputValidator: (value) => {
+                if (!value || !value.trim()) {
+                    return 'Please enter a valid slot number';
+                }
+            }
+        });
         
         if (!slotNumber) {
             return; // User cancelled
         }
 
         const trimmedSlotNumber = slotNumber.trim().toUpperCase();
-        
-        if (!trimmedSlotNumber) {
-            toast.error("Please enter a valid slot number.");
-            return;
-        }
 
         try {
             const existingSlot = await db.parkingSlots.where('slotNumber').equals(trimmedSlotNumber).first();
@@ -149,11 +157,23 @@ const AdminDashboard = () => {
     
     // This function is for the main "Delete Last" button
     const handleDeleteLastSlot = async () => {
-        if (window.confirm("Are you sure you want to delete the last added slot?")) {
+        const result = await Swal.fire({
+            title: 'Delete Last Slot?',
+            text: 'Are you sure you want to delete the last added parking slot?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, Delete Slot',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (result.isConfirmed) {
             try {
                 const lastSlot = await db.parkingSlots.orderBy('id').last();
                 if (lastSlot) {
                     await db.parkingSlots.delete(lastSlot.id);
+                    toast.success(`Slot ${lastSlot.slotNumber} deleted successfully.`);
                 } else {
                     toast.error("No slots to delete.");
                 }
@@ -182,11 +202,29 @@ const AdminDashboard = () => {
 
     // This function is for the 'X' on each individual slot
     const handleDeleteSlot = async (id) => {
-        if (window.confirm("Are you sure you want to delete this specific slot?")) {
-            const slotToDelete = await db.parkingSlots.get(id);
+        const slotToDelete = await db.parkingSlots.get(id);
+        
+        const result = await Swal.fire({
+            title: 'Delete Parking Slot?',
+            html: `
+                <div class="text-left">
+                    <p>Are you sure you want to delete <strong>Slot ${slotToDelete?.slotNumber}</strong>?</p>
+                    <p class="text-sm text-gray-600 mt-2">This action cannot be undone.</p>
+                </div>
+            `,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, Delete Slot',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (result.isConfirmed) {
             if (slotToDelete && (slotToDelete.status === 'available'|| slotToDelete.status === 'maintenance')) {
                 try {
                     await db.parkingSlots.delete(id);
+                    toast.success(`Slot ${slotToDelete.slotNumber} deleted successfully.`);
                 } catch (error) {
                     console.error("Failed to delete slot:", error);
                     toast.error("An error occurred while deleting the slot.");
@@ -199,7 +237,18 @@ const AdminDashboard = () => {
 
 
      const handleDeleteStaff = async (staffId) => {
-        if (window.confirm("Are you sure you want to delete this staff member? This action cannot be undone.")) {
+        const result = await Swal.fire({
+            title: 'Delete Staff Member?',
+            text: 'This action cannot be undone. The staff member will be permanently removed from the system.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, Delete Staff',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (result.isConfirmed) {
             try {
                 await db.users.delete(staffId);
                 toast.success("Staff member deleted successfully.");
@@ -213,7 +262,30 @@ const AdminDashboard = () => {
     // --- NEW: Function to delete a customer ---
     const handleDeleteCustomer = async (customerId) => {
         // Check if the customer has an active booking and handle it.
-        if (window.confirm("Are you sure you want to delete this customer? This will also free up any parking slots they have booked. This action cannot be undone.")) {
+        const result = await Swal.fire({
+            title: 'Delete Customer?',
+            html: `
+                <div class="text-left">
+                    <p>Are you sure you want to delete this customer?</p>
+                    <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                        <p class="text-sm text-yellow-800">
+                            <strong>Warning:</strong> This will also free up any parking slots they have booked.
+                        </p>
+                        <p class="text-sm text-yellow-800 mt-1">
+                            This action cannot be undone.
+                        </p>
+                    </div>
+                </div>
+            `,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, Delete Customer',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (result.isConfirmed) {
             try {
                 // Get customer information before deletion
                 const customer = await db.users.get(customerId);

@@ -37,23 +37,26 @@ export const AuthProvider = ({ children }) => {
             switch(potentialUser.role) {
                 case 'admin':
                     navigate('/admin/dashboard');
+                    toast.success('Welcome Admin!');
                     break;
                 case 'staff':
                     navigate('/staff/dashboard');
+                    toast.success('Welcome Staff!');
                     break;
                 case 'customer':
                     navigate('/customer/dashboard');
+                    toast.success('Welcome Customer!');
                     break;
                 default:
-                    // Fallback to a generic dashboard or home page if role is unknown
-                    navigate('/'); 
+                    
+                    navigate('/home'); 
             }
             return true; // Return true on success
         }
         
-        // This 'else' is no longer needed
+       
         toast.error('Invalid email or password!');
-        return false; // Return false on failure
+        return false; 
     };
 
     const register = async (userData) => {
